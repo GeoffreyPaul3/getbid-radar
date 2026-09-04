@@ -978,19 +978,23 @@ export type Database = {
           confidence: number | null
           created_at: string
           critical_blockers: string[]
+          engine_version: string | null
           error_message: string | null
           estimated_effort_hours_max: number | null
           estimated_effort_hours_min: number | null
           evaluation_criteria: Json
+          evidence_coverage: number | null
           executive_summary: string | null
           human_override: Database["public"]["Enums"]["recommendation"] | null
           human_override_at: string | null
           human_override_by: string | null
           human_override_reason: string | null
           id: string
+          inputs_fingerprint: string | null
           missing_evidence: string[]
           model: string | null
           negative_factors: string[]
+          open_questions: string[]
           opportunity_id: string
           positive_factors: string[]
           reasoning: string | null
@@ -1011,19 +1015,23 @@ export type Database = {
           confidence?: number | null
           created_at?: string
           critical_blockers?: string[]
+          engine_version?: string | null
           error_message?: string | null
           estimated_effort_hours_max?: number | null
           estimated_effort_hours_min?: number | null
           evaluation_criteria?: Json
+          evidence_coverage?: number | null
           executive_summary?: string | null
           human_override?: Database["public"]["Enums"]["recommendation"] | null
           human_override_at?: string | null
           human_override_by?: string | null
           human_override_reason?: string | null
           id?: string
+          inputs_fingerprint?: string | null
           missing_evidence?: string[]
           model?: string | null
           negative_factors?: string[]
+          open_questions?: string[]
           opportunity_id: string
           positive_factors?: string[]
           reasoning?: string | null
@@ -1044,19 +1052,23 @@ export type Database = {
           confidence?: number | null
           created_at?: string
           critical_blockers?: string[]
+          engine_version?: string | null
           error_message?: string | null
           estimated_effort_hours_max?: number | null
           estimated_effort_hours_min?: number | null
           evaluation_criteria?: Json
+          evidence_coverage?: number | null
           executive_summary?: string | null
           human_override?: Database["public"]["Enums"]["recommendation"] | null
           human_override_at?: string | null
           human_override_by?: string | null
           human_override_reason?: string | null
           id?: string
+          inputs_fingerprint?: string | null
           missing_evidence?: string[]
           model?: string | null
           negative_factors?: string[]
+          open_questions?: string[]
           opportunity_id?: string
           positive_factors?: string[]
           reasoning?: string | null
@@ -1170,58 +1182,97 @@ export type Database = {
       opportunity_requirements: {
         Row: {
           action_required: string | null
+          analysis_version: number | null
+          category: string | null
           company_match: string | null
           created_at: string
+          due_date: string | null
           evidence: string | null
+          evidence_needed: string | null
+          extraction_confidence: number | null
+          fingerprint: string | null
           human_edited: boolean
           human_note: string | null
           id: string
+          importance: string
+          is_ambiguous: boolean
           is_mandatory: boolean
+          match_confidence: number | null
           opportunity_id: string
+          reasoning: string | null
           req_type: Database["public"]["Enums"]["requirement_type"]
           requirement: string
           risk: string | null
           source_document_id: string | null
+          source_page: number | null
           source_reference: string | null
+          source_section: string | null
           status: Database["public"]["Enums"]["requirement_status"]
+          threshold_value: string | null
           updated_at: string
           workspace_id: string
         }
         Insert: {
           action_required?: string | null
+          analysis_version?: number | null
+          category?: string | null
           company_match?: string | null
           created_at?: string
+          due_date?: string | null
           evidence?: string | null
+          evidence_needed?: string | null
+          extraction_confidence?: number | null
+          fingerprint?: string | null
           human_edited?: boolean
           human_note?: string | null
           id?: string
+          importance?: string
+          is_ambiguous?: boolean
           is_mandatory?: boolean
+          match_confidence?: number | null
           opportunity_id: string
+          reasoning?: string | null
           req_type?: Database["public"]["Enums"]["requirement_type"]
           requirement: string
           risk?: string | null
           source_document_id?: string | null
+          source_page?: number | null
           source_reference?: string | null
+          source_section?: string | null
           status?: Database["public"]["Enums"]["requirement_status"]
+          threshold_value?: string | null
           updated_at?: string
           workspace_id: string
         }
         Update: {
           action_required?: string | null
+          analysis_version?: number | null
+          category?: string | null
           company_match?: string | null
           created_at?: string
+          due_date?: string | null
           evidence?: string | null
+          evidence_needed?: string | null
+          extraction_confidence?: number | null
+          fingerprint?: string | null
           human_edited?: boolean
           human_note?: string | null
           id?: string
+          importance?: string
+          is_ambiguous?: boolean
           is_mandatory?: boolean
+          match_confidence?: number | null
           opportunity_id?: string
+          reasoning?: string | null
           req_type?: Database["public"]["Enums"]["requirement_type"]
           requirement?: string
           risk?: string | null
           source_document_id?: string | null
+          source_page?: number | null
           source_reference?: string | null
+          source_section?: string | null
           status?: Database["public"]["Enums"]["requirement_status"]
+          threshold_value?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -1336,6 +1387,8 @@ export type Database = {
       score_components: {
         Row: {
           analysis_id: string
+          blocking: boolean
+          confidence: number | null
           created_at: string
           id: string
           key: string
@@ -1347,6 +1400,8 @@ export type Database = {
         }
         Insert: {
           analysis_id: string
+          blocking?: boolean
+          confidence?: number | null
           created_at?: string
           id?: string
           key: string
@@ -1358,6 +1413,8 @@ export type Database = {
         }
         Update: {
           analysis_id?: string
+          blocking?: boolean
+          confidence?: number | null
           created_at?: string
           id?: string
           key?: string
