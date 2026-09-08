@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import logo from "@/assets/bidradar.png"
 import {
   Radar,
   ArrowRight,
@@ -21,6 +22,7 @@ import {
   HelpCircle,
   Check,
   Search,
+  FileCheck2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -38,12 +40,8 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-subtle transition-transform duration-150 group-hover:scale-105">
-                <Radar className="h-4 w-4" />
-              </div>
-              <span className="font-display font-bold text-lg text-foreground tracking-tight">
-                GetBid<span className="text-primary">Radar</span>
-              </span>
+              <img src={logo} width={160} height={130} alt="BidRadar"  />                            
+              
             </Link>
             <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-text-secondary">
               <a href="#problem" className="hover:text-foreground transition-colors">
@@ -99,7 +97,7 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/25 bg-primary-soft text-primary text-[11px] font-mono font-semibold uppercase tracking-wider mb-6">
-              <Sparkles className="h-3.5 w-3.5" />
+              <FileCheck2 className="h-3.5 w-3.5" />
               Contract Intelligence Platform
             </div>
             <h1 className="font-display font-extrabold text-3xl sm:text-5xl lg:text-6xl text-foreground tracking-tight leading-[1.1] mb-6">
@@ -534,8 +532,9 @@ function LandingPage() {
       {/* Bottom CTA */}
       <section className="py-20 border-t border-border bg-surface">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white mb-6 shadow-panel">
-            <Radar className="h-6 w-6" />
+          <div className="inline-flex items-center justify-center  mb-6 ">
+          
+              <img src={logo} width={160} height={130} alt="BidRadar"  />                              
           </div>
           <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-foreground tracking-tight mb-4">
             Evaluate your next contract with decision intelligence.
@@ -560,10 +559,10 @@ function LandingPage() {
       <footer className="py-8 border-t border-border bg-canvas text-xs text-muted-foreground">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white text-[10px] font-bold font-mono">
-              BR
-            </div>
-            <span className="font-display font-bold text-foreground">GetBidRadar</span>
+            <Link to="/" className="flex items-center">
+              <img src={logo} width={140} height={130} alt="BidRadar"  />                              
+            </Link>
+            
             <span>— Enterprise Contract Intelligence Engine</span>
           </div>
           <p>© {new Date().getFullYear()} GetBidRadar. All rights reserved.</p>

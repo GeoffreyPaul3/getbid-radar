@@ -34,6 +34,7 @@ import {
   ExternalLink,
   ShieldAlert,
   ListTodo,
+  FileBarChart,
 } from "lucide-react";
 import { analyzeOpportunity, getAnalysis } from "@/lib/analysis/analysis.functions";
 import { toast } from "sonner";
@@ -310,7 +311,7 @@ function IntelligenceReportPage() {
             params={{ id: opportunity.id }}
             className="pb-3 border-b-2 border-accent text-foreground font-semibold flex items-center gap-2"
           >
-            <Sparkles className="h-4 w-4 text-accent" /> Intelligence Report
+            <FileBarChart className="h-4 w-4 text-accent" /> Intelligence Report
           </Link>
           <Link
             to="/tenders/$id/requirements"
