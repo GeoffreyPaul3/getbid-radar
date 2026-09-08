@@ -16,9 +16,9 @@ export const DEFAULT_MODEL = "google/gemini-2.5-flash";
 
 export type AiUsage = {
   model: string;
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens?: number;
+  promptTokens?: number | undefined;
+  completionTokens?: number | undefined;
+  totalTokens?: number | undefined;
   durationMs: number;
   attempts: number;
 };
@@ -47,7 +47,7 @@ export type AiCallOptions<T> = {
   /** JSON schema describing the expected structured payload. */
   jsonSchema: Record<string, unknown>;
   /** Zod schema used to validate the parsed payload. */
-  schema: z.ZodType<T>;
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>;
   model?: string;
   temperature?: number;
   timeoutMs?: number;
@@ -60,7 +60,11 @@ function emptyUsage(model: string, started: number, attempts: number): AiUsage {
 
 /** Extract a JSON object from raw text, tolerating code fences and prose. */
 export function recoverJson(raw: string): unknown | undefined {
-  const trimmed = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const trimmed = raw
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
   try {
     return JSON.parse(trimmed);
   } catch {

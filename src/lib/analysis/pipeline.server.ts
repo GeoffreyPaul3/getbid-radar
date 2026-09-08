@@ -20,18 +20,10 @@ import {
   type MatchRequirementInput,
   type OpportunityFacts,
 } from "@/lib/ai/operations.server";
-import {
-  loadEvidenceBundle,
-  retrieveEvidence,
-  type EvidenceItem,
-} from "@/lib/ai/evidence.server";
+import { loadEvidenceBundle, retrieveEvidence, type EvidenceItem } from "@/lib/ai/evidence.server";
 import type { AiUsage } from "@/lib/ai/gateway.server";
 import { scoreOpportunity, type ScoredRequirement } from "@/lib/scoring/engine";
-import type {
-  ExtractedRequirement,
-  RequirementCategory,
-  MatchVerdict,
-} from "@/lib/ai/schemas";
+import type { ExtractedRequirement, RequirementCategory, MatchVerdict } from "@/lib/ai/schemas";
 
 export type Client = SupabaseClient<Database>;
 
@@ -82,7 +74,11 @@ export function sha256(value: string): string {
 }
 
 export function normalizeRequirementText(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Stable identity of a requirement, used for idempotent upserts. */
@@ -107,9 +103,7 @@ export function inputsFingerprint(input: {
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((d) => `${d.id}:${d.updatedAt}:${d.charCount ?? 0}`)
     .join(",");
-  return sha256(
-    `${input.engineVersion}|${input.opportunityId}|${docs}|${input.companySignature}`,
-  );
+  return sha256(`${input.engineVersion}|${input.opportunityId}|${docs}|${input.companySignature}`);
 }
 
 export function companySignature(company: CompanyFacts): string {
@@ -125,25 +119,27 @@ export function companySignature(company: CompanyFacts): string {
   ).slice(0, 32);
 }
 
-const CATEGORY_TO_REQ_TYPE: Record<RequirementCategory, Database["public"]["Enums"]["requirement_type"]> =
-  {
-    eligibility: "eligibility",
-    legal_registration: "legal",
-    financial: "financial",
-    technical: "technical",
-    capability: "technical",
-    experience: "experience",
-    certification: "certification",
-    staffing: "experience",
-    equipment_resources: "technical",
-    geographic: "delivery",
-    commercial: "commercial",
-    delivery: "delivery",
-    timeline: "delivery",
-    documentation: "documentation",
-    compliance: "legal",
-    other: "technical",
-  };
+const CATEGORY_TO_REQ_TYPE: Record<
+  RequirementCategory,
+  Database["public"]["Enums"]["requirement_type"]
+> = {
+  eligibility: "eligibility",
+  legal_registration: "legal",
+  financial: "financial",
+  technical: "technical",
+  capability: "technical",
+  experience: "experience",
+  certification: "certification",
+  staffing: "experience",
+  equipment_resources: "technical",
+  geographic: "delivery",
+  commercial: "commercial",
+  delivery: "delivery",
+  timeline: "delivery",
+  documentation: "documentation",
+  compliance: "legal",
+  other: "technical",
+};
 
 export function verdictToStatus(
   verdict: MatchVerdict,
@@ -252,7 +248,7 @@ async function recordUsage(
     resourceId: string;
     usage: AiUsage;
     success: boolean;
-    failureCode?: string;
+    failureCode?: string | undefined;
   },
 ) {
   await supabase.from("usage_records").insert({
@@ -332,7 +328,8 @@ export async function runOpportunityAnalysis(args: {
     .maybeSingle();
 
   if (oppError) return fail("PERSISTENCE", "OPPORTUNITY_LOAD_FAILED", oppError.message);
-  if (!opportunity) return fail("PERSISTENCE", "NOT_FOUND", "Opportunity not found in your workspace.");
+  if (!opportunity)
+    return fail("PERSISTENCE", "NOT_FOUND", "Opportunity not found in your workspace.");
 
   const workspaceId = opportunity.workspace_id;
 
@@ -392,7 +389,8 @@ export async function runOpportunityAnalysis(args: {
       analysisId: completedMatch.id,
       version: completedMatch.version,
       score: completedMatch.bidradar_score ?? 0,
-      recommendation: (completedMatch.recommendation ?? "review") as PipelineSuccess["recommendation"],
+      recommendation: (completedMatch.recommendation ??
+        "review") as PipelineSuccess["recommendation"],
       confidence: Number(completedMatch.confidence ?? 0),
       reused: true,
     };
@@ -416,7 +414,11 @@ export async function runOpportunityAnalysis(args: {
     .single();
 
   if (createError || !analysisRow) {
-    return fail("PERSISTENCE", "PERSISTENCE_FAILED", createError?.message ?? "Could not create analysis.");
+    return fail(
+      "PERSISTENCE",
+      "PERSISTENCE_FAILED",
+      createError?.message ?? "Could not create analysis.",
+    );
   }
   const analysisId = analysisRow.id;
 
@@ -499,9 +501,7 @@ export async function runOpportunityAnalysis(args: {
 
   /* --- 2. persist requirements idempotently --- */
   const docIdByName = new Map(ready.map((d) => [d.file_name.toLowerCase(), d.id]));
-  const normalized = extraction.data.requirements.map((r) =>
-    normalizeRequirement(r, nextVersion),
-  );
+  const normalized = extraction.data.requirements.map((r) => normalizeRequirement(r, nextVersion));
 
   const seen = new Set<string>();
   const rows = normalized
@@ -535,7 +535,11 @@ export async function runOpportunityAnalysis(args: {
     .eq("workspace_id", workspaceId);
 
   if (loadReqError || !storedRequirements) {
-    const failure = fail("PERSISTENCE", "PERSISTENCE_FAILED", loadReqError?.message ?? "load failed");
+    const failure = fail(
+      "PERSISTENCE",
+      "PERSISTENCE_FAILED",
+      loadReqError?.message ?? "load failed",
+    );
     await markFailed(supabase, opportunityId, workspaceId, userId, failure, analysisId);
     return failure;
   }
@@ -604,6 +608,7 @@ export async function runOpportunityAnalysis(args: {
 
   /* --- persist match results + evidence references --- */
   const evidenceRows: Database["public"]["Tables"]["evidence_references"]["Insert"][] = [];
+  const reqUpdatePromises: Array<PromiseLike<{ error: { message: string } | null }>> = [];
 
   for (const r of storedRequirements) {
     const match = matchByRef.get(r.id);
@@ -614,22 +619,26 @@ export async function runOpportunityAnalysis(args: {
     const evidenceCount = cited.length;
 
     if (!r.human_edited) {
-      await supabase
-        .from("opportunity_requirements")
-        .update({
-          status: verdictToStatus((match?.verdict ?? "unknown") as MatchVerdict, evidenceCount),
-          company_match: match?.verdict ?? "unknown",
-          match_confidence: match?.confidence ?? 0,
-          evidence: cited.length
-            ? cited.map((e) => `${e.label}${e.excerpt ? `: ${e.excerpt.slice(0, 400)}` : ""}`).join("\n")
-            : "Evidence not found",
-          risk: match?.risk ?? null,
-          action_required: match?.action_required ?? null,
-          reasoning: match?.reasoning ?? r.reasoning,
-          analysis_version: nextVersion,
-        })
-        .eq("id", r.id)
-        .eq("workspace_id", workspaceId);
+      reqUpdatePromises.push(
+        supabase
+          .from("opportunity_requirements")
+          .update({
+            status: verdictToStatus((match?.verdict ?? "unknown") as MatchVerdict, evidenceCount),
+            company_match: match?.verdict ?? "unknown",
+            match_confidence: match?.confidence ?? 0,
+            evidence: cited.length
+              ? cited
+                  .map((e) => `${e.label}${e.excerpt ? `: ${e.excerpt.slice(0, 400)}` : ""}`)
+                  .join("\n")
+              : "Evidence not found",
+            risk: match?.risk ?? null,
+            action_required: match?.action_required ?? null,
+            reasoning: match?.reasoning ?? r.reasoning,
+            analysis_version: nextVersion,
+          })
+          .eq("id", r.id)
+          .eq("workspace_id", workspaceId),
+      );
     }
 
     for (const e of cited) {
@@ -645,6 +654,16 @@ export async function runOpportunityAnalysis(args: {
         certification_id: e.certificationId,
         source_reference: e.sourceReference,
       });
+    }
+  }
+
+  if (reqUpdatePromises.length > 0) {
+    const updateResults = await Promise.all(reqUpdatePromises);
+    const failedUpdate = updateResults.find((res) => res.error);
+    if (failedUpdate?.error) {
+      const failure = fail("PERSISTENCE", "PERSISTENCE_FAILED", failedUpdate.error.message);
+      await markFailed(supabase, opportunityId, workspaceId, userId, failure, analysisId);
+      return failure;
     }
   }
 

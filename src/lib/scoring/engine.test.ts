@@ -47,6 +47,27 @@ describe("weights", () => {
 });
 
 describe("threshold boundaries", () => {
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+
+  function inputForTargetScore(targetScore: number): {
+    assessment: AssessmentInput;
+    requirements: ScoredRequirement[];
+  } {
+    if (targetScore === 0) {
+      return { assessment: assessment(0), requirements: [] };
+    }
+    if (targetScore === 100) {
+      return { assessment: assessment(100), requirements: [evidencedRequirement()] };
+    }
+    const neededFromOthers = targetScore - 10; // evidencedRequirement provides 10 points (score 100 * weight 0.1)
+    const baseScore = round1(neededFromOthers / 0.9);
+    const a = assessment(baseScore);
+    const currentTotal = round1(baseScore * 0.9 + 10);
+    const diff = round1(targetScore - currentTotal);
+    a.risk.score = round1(a.risk.score + diff / 0.1);
+    return { assessment: a, requirements: [evidencedRequirement()] };
+  }
+
   const cases: Array<[number, "bid" | "review" | "no_bid"]> = [
     [0, "no_bid"],
     [49, "no_bid"],
@@ -58,9 +79,10 @@ describe("threshold boundaries", () => {
 
   for (const [score, expected] of cases) {
     it(`score ${score} → ${expected}`, () => {
+      const { assessment: a, requirements } = inputForTargetScore(score);
       const result = scoreOpportunity({
-        assessment: assessment(score),
-        requirements: [evidencedRequirement()],
+        assessment: a,
+        requirements,
         deadline: "2026-06-01T00:00:00.000Z",
         now: NOW,
       });

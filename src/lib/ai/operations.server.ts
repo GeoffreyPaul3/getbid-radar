@@ -206,7 +206,11 @@ export async function matchRequirements(input: {
   const knowledgeBlock = knowledge.length
     ? knowledge
         .map((e) =>
-          wrapUntrusted(`${e.id} :: ${e.label}${e.sourceReference ? ` (${e.sourceReference})` : ""}`, e.excerpt ?? "", 4_000),
+          wrapUntrusted(
+            `${e.id} :: ${e.label}${e.sourceReference ? ` (${e.sourceReference})` : ""}`,
+            e.excerpt ?? "",
+            4_000,
+          ),
         )
         .join("\n\n")
     : "(no knowledge-base excerpts retrieved)";
@@ -275,9 +279,14 @@ export async function assessOpportunity(input: {
     `Profile: ${JSON.stringify(profile)}`,
     `Capabilities: ${input.company.capabilities.map((c) => `${c.name} (${c.kind})`).join(", ") || "none recorded"}`,
     `Certifications: ${input.company.certifications.map((c) => `${c.name} [${c.status}]`).join(", ") || "none recorded"}`,
-    `Past projects: ${input.company.projects
-      .map((p) => `${p.name} — ${p.client ?? "unknown client"}, ${p.location ?? "unknown location"}, ${p.contract_value ?? "unknown value"} ${p.currency}`)
-      .join(" | ") || "none recorded"}`,
+    `Past projects: ${
+      input.company.projects
+        .map(
+          (p) =>
+            `${p.name} — ${p.client ?? "unknown client"}, ${p.location ?? "unknown location"}, ${p.contract_value ?? "unknown value"} ${p.currency}`,
+        )
+        .join(" | ") || "none recorded"
+    }`,
     `Team: ${input.company.team.map((t) => `${t.name} (${t.role ?? "role unspecified"})`).join(", ") || "none recorded"}`,
     `Client references on file: ${input.company.referenceCount}`,
   ].join("\n");

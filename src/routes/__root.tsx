@@ -76,15 +76,45 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=5" },
+      { title: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine" },
+      {
+        name: "description",
+        content:
+          "AI-powered tender intelligence, automated requirement extraction, deterministic bid/no-bid qualification scoring, and verified company evidence retrieval.",
+      },
+      {
+        name: "keywords",
+        content:
+          "tender management, bid no bid engine, RFP analysis, procurement intelligence, tender qualification, AI bid proposal, government tenders",
+      },
+      { name: "author", content: "GetBidRadar" },
+      { name: "application-name", content: "GetBidRadar" },
+      { name: "apple-mobile-web-app-title", content: "GetBidRadar" },
+      { name: "theme-color", content: "#0f172a" },
+      { name: "robots", content: "index, follow" },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "GetBidRadar" },
+      {
+        property: "og:title",
+        content: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine",
+      },
+      {
+        property: "og:description",
+        content:
+          "Automate tender analysis, extract mandatory requirements in seconds, match against your corporate knowledge base, and receive deterministic bid/no-bid recommendations.",
+      },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      {
+        name: "twitter:title",
+        content: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Automate tender analysis, extract mandatory requirements in seconds, and receive deterministic bid/no-bid recommendations backed by verified evidence.",
+      },
     ],
     links: [
       {
@@ -92,6 +122,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "canonical", href: "https://getbid-radar.vercel.app" },
     ],
   }),
   shellComponent: RootShell,

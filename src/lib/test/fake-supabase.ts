@@ -104,7 +104,8 @@ class FakeQuery implements PromiseLike<{ data: any; error: any }> {
   private execute(): { data: any; error: any } {
     this.db.calls.push({ table: this.table, op: this.op, filters: [...this.filters] });
 
-    const failure = this.db.options.failOn?.[`${this.table}.${this.op}`] ?? this.db.options.failOn?.[this.table];
+    const failure =
+      this.db.options.failOn?.[`${this.table}.${this.op}`] ?? this.db.options.failOn?.[this.table];
     if (failure) return { data: null, error: { message: failure } };
 
     const rows = this.rows();
@@ -132,7 +133,8 @@ class FakeQuery implements PromiseLike<{ data: any; error: any }> {
       }
     } else if (this.op === "update") {
       result = rows.filter((r) => this.matches(r));
-      for (const row of result) Object.assign(row, this.payload, { updated_at: new Date().toISOString() });
+      for (const row of result)
+        Object.assign(row, this.payload, { updated_at: new Date().toISOString() });
     } else if (this.op === "delete") {
       result = rows.filter((r) => this.matches(r));
       this.db.tables[this.table] = rows.filter((r) => !this.matches(r));

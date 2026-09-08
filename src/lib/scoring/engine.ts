@@ -110,9 +110,7 @@ export function computeEvidenceStrength(requirements: ScoredRequirement[]): {
   return { score: clamp(round1(coverage * 100)), coverage: round2(coverage) };
 }
 
-export function detectMandatoryFailures(
-  requirements: ScoredRequirement[],
-): MandatoryFailure[] {
+export function detectMandatoryFailures(requirements: ScoredRequirement[]): MandatoryFailure[] {
   const failures: MandatoryFailure[] = [];
   for (const r of requirements) {
     if (!r.isMandatory) continue;
@@ -165,7 +163,8 @@ export function computeConfidence(input: {
     ) / 7;
 
   const total = requirements.length;
-  const unknownRatio = total === 0 ? 1 : requirements.filter((r) => r.verdict === "unknown").length / total;
+  const unknownRatio =
+    total === 0 ? 1 : requirements.filter((r) => r.verdict === "unknown").length / total;
   const matchConfidence =
     total === 0 ? 0 : requirements.reduce((s, r) => s + r.confidence, 0) / total;
 
@@ -182,24 +181,25 @@ export function scoreOpportunity(input: ScoringInput): ScoringResult {
   const deadlinePassed = isDeadlinePassed(deadline, now);
   const confirmedFailures = mandatoryFailures.filter((f) => f.kind === "confirmed");
 
-  const rawScores: Record<ComponentKey, { score: number; confidence: number; rationale: string }> = {
-    eligibility: assessment.eligibility,
-    capability: assessment.capability,
-    experience: assessment.experience,
-    commercial_fit: assessment.commercial_fit,
-    resource_fit: assessment.resource_fit,
-    deadline_fit: deadlinePassed
-      ? { score: 0, confidence: 1, rationale: "The submission deadline has already passed." }
-      : assessment.deadline_fit,
-    risk: assessment.risk,
-    evidence_strength: {
-      score: evidence.score,
-      confidence: 1,
-      rationale: `Derived from evidence coverage across mandatory and high-importance requirements (${Math.round(
-        evidence.coverage * 100,
-      )}%).`,
-    },
-  };
+  const rawScores: Record<ComponentKey, { score: number; confidence: number; rationale: string }> =
+    {
+      eligibility: assessment.eligibility,
+      capability: assessment.capability,
+      experience: assessment.experience,
+      commercial_fit: assessment.commercial_fit,
+      resource_fit: assessment.resource_fit,
+      deadline_fit: deadlinePassed
+        ? { score: 0, confidence: 1, rationale: "The submission deadline has already passed." }
+        : assessment.deadline_fit,
+      risk: assessment.risk,
+      evidence_strength: {
+        score: evidence.score,
+        confidence: 1,
+        rationale: `Derived from evidence coverage across mandatory and high-importance requirements (${Math.round(
+          evidence.coverage * 100,
+        )}%).`,
+      },
+    };
 
   const components: ScoreComponent[] = COMPONENT_KEYS.map((key) => {
     const raw = rawScores[key];
@@ -238,7 +238,9 @@ export function scoreOpportunity(input: ScoringInput): ScoringResult {
     reasons.push("The submission deadline has already passed.");
   } else if (score < RECOMMENDATION_THRESHOLDS.review) {
     recommendation = "no_bid";
-    reasons.push(`BidRadar score ${score} is below the no-bid threshold of ${RECOMMENDATION_THRESHOLDS.review}.`);
+    reasons.push(
+      `BidRadar score ${score} is below the no-bid threshold of ${RECOMMENDATION_THRESHOLDS.review}.`,
+    );
   } else if (score >= RECOMMENDATION_THRESHOLDS.bid) {
     const uncertain = mandatoryFailures.filter((f) => f.kind !== "confirmed");
     if (uncertain.length > 0) {
@@ -255,7 +257,9 @@ export function scoreOpportunity(input: ScoringInput): ScoringResult {
       );
     } else {
       recommendation = "bid";
-      reasons.push(`BidRadar score ${score} meets the bid threshold of ${RECOMMENDATION_THRESHOLDS.bid} with no confirmed blockers.`);
+      reasons.push(
+        `BidRadar score ${score} meets the bid threshold of ${RECOMMENDATION_THRESHOLDS.bid} with no confirmed blockers.`,
+      );
     }
   } else {
     recommendation = "review";

@@ -49,10 +49,44 @@ export type EvidenceBundle = {
 };
 
 const STOP_WORDS = new Set([
-  "the", "and", "for", "with", "that", "this", "shall", "must", "will", "have", "has",
-  "are", "any", "all", "from", "into", "not", "your", "our", "their", "been", "such",
-  "each", "least", "than", "years", "year", "provide", "evidence", "bidder", "tenderer",
-  "requirement", "required", "documents", "document", "including", "include", "minimum",
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "shall",
+  "must",
+  "will",
+  "have",
+  "has",
+  "are",
+  "any",
+  "all",
+  "from",
+  "into",
+  "not",
+  "your",
+  "our",
+  "their",
+  "been",
+  "such",
+  "each",
+  "least",
+  "than",
+  "years",
+  "year",
+  "provide",
+  "evidence",
+  "bidder",
+  "tenderer",
+  "requirement",
+  "required",
+  "documents",
+  "document",
+  "including",
+  "include",
+  "minimum",
 ]);
 
 export function tokenize(text: string): string[] {
@@ -111,7 +145,11 @@ export async function loadEvidenceBundle(
     await Promise.all([
       supabase.from("company_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle(),
       supabase.from("company_capabilities").select("*").eq("workspace_id", workspaceId).limit(500),
-      supabase.from("company_certifications").select("*").eq("workspace_id", workspaceId).limit(500),
+      supabase
+        .from("company_certifications")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .limit(500),
       supabase.from("company_projects").select("*").eq("workspace_id", workspaceId).limit(500),
       supabase.from("company_references").select("*").eq("workspace_id", workspaceId).limit(500),
       supabase.from("team_members").select("*").eq("workspace_id", workspaceId).limit(500),
@@ -155,7 +193,9 @@ export async function loadEvidenceBundle(
         profile.description,
         profile.industry ? `Industry: ${profile.industry}` : null,
         profile.country ? `Country: ${profile.country}` : null,
-        profile.years_in_operation != null ? `Years in operation: ${profile.years_in_operation}` : null,
+        profile.years_in_operation != null
+          ? `Years in operation: ${profile.years_in_operation}`
+          : null,
         profile.employee_count != null ? `Employees: ${profile.employee_count}` : null,
         profile.annual_turnover != null
           ? `Annual turnover: ${profile.annual_turnover} ${profile.currency}`
@@ -229,7 +269,9 @@ export async function loadEvidenceBundle(
         p.industry ? `Industry: ${p.industry}` : null,
         p.location ? `Location: ${p.location}` : null,
         p.contract_value != null ? `Value: ${p.contract_value} ${p.currency}` : null,
-        p.start_date || p.end_date ? `Period: ${p.start_date ?? "?"} to ${p.end_date ?? "?"}` : null,
+        p.start_date || p.end_date
+          ? `Period: ${p.start_date ?? "?"} to ${p.end_date ?? "?"}`
+          : null,
         p.scope,
         p.services_delivered?.length ? `Services: ${p.services_delivered.join(", ")}` : null,
         p.capabilities?.length ? `Capabilities: ${p.capabilities.join(", ")}` : null,
@@ -287,7 +329,8 @@ export async function loadEvidenceBundle(
       certificationId: null,
       label: ch.section ? `Knowledge base — ${ch.section}` : "Knowledge base excerpt",
       excerpt: ch.content,
-      sourceReference: ch.page_number != null ? `page ${ch.page_number}` : `chunk ${ch.chunk_index}`,
+      sourceReference:
+        ch.page_number != null ? `page ${ch.page_number}` : `chunk ${ch.chunk_index}`,
       relevance: 0,
       strength: "moderate",
     });

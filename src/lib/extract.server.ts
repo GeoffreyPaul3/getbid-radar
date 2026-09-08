@@ -121,7 +121,8 @@ function extractXlsx(bytes: Uint8Array): ExtractResult {
       }
     }
     const text = lines.join("\n").trim();
-    if (!text) return { ok: false, text: "", reason: "No readable cells found in this spreadsheet." };
+    if (!text)
+      return { ok: false, text: "", reason: "No readable cells found in this spreadsheet." };
     return { ok: true, text: text.slice(0, MAX_TEXT) };
   } catch (e) {
     return { ok: false, text: "", reason: `XLSX could not be parsed: ${(e as Error).message}` };
@@ -145,10 +146,7 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-export async function extractDocument(
-  fileName: string,
-  bytes: Uint8Array,
-): Promise<ExtractResult> {
+export async function extractDocument(fileName: string, bytes: Uint8Array): Promise<ExtractResult> {
   const ext = extensionOf(fileName);
   switch (ext) {
     case "pdf":

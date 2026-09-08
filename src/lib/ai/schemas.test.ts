@@ -59,8 +59,12 @@ describe("requirement extraction schema", () => {
   });
 
   it("rejects an out-of-range confidence", () => {
-    expect(extractedRequirementSchema.safeParse({ ...validRequirement, confidence: 1.4 }).success).toBe(false);
-    expect(extractedRequirementSchema.safeParse({ ...validRequirement, confidence: -1 }).success).toBe(false);
+    expect(
+      extractedRequirementSchema.safeParse({ ...validRequirement, confidence: 1.4 }).success,
+    ).toBe(false);
+    expect(
+      extractedRequirementSchema.safeParse({ ...validRequirement, confidence: -1 }).success,
+    ).toBe(false);
   });
 
   it("rejects a missing required field", () => {
@@ -69,8 +73,12 @@ describe("requirement extraction schema", () => {
   });
 
   it("rejects a non-integer / negative source page", () => {
-    expect(extractedRequirementSchema.safeParse({ ...validRequirement, source_page: 2.5 }).success).toBe(false);
-    expect(extractedRequirementSchema.safeParse({ ...validRequirement, source_page: -3 }).success).toBe(false);
+    expect(
+      extractedRequirementSchema.safeParse({ ...validRequirement, source_page: 2.5 }).success,
+    ).toBe(false);
+    expect(
+      extractedRequirementSchema.safeParse({ ...validRequirement, source_page: -3 }).success,
+    ).toBe(false);
   });
 
   it("accepts an extraction envelope and defaults optional fields", () => {
@@ -147,7 +155,10 @@ describe("assessment schema", () => {
     expect(
       bidAssessmentSchema.safeParse({
         ...validAssessment,
-        components: { ...validAssessment.components, risk: { score: 250, confidence: 1, rationale: "" } },
+        components: {
+          ...validAssessment.components,
+          risk: { score: 250, confidence: 1, rationale: "" },
+        },
       }).success,
     ).toBe(false);
   });
