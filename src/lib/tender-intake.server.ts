@@ -244,6 +244,13 @@ export async function ingestTenderFromUrl(args: {
 }) {
   const { supabase, userId, workspaceId, url, customTitle, buyer } = args;
 
+  // 0. Enforce server-authoritative billing entitlements
+  const { canAnalyzeTender, recordAnalysisUsage } = await import("./billing/entitlements.server");
+  const { allowed, reason } = await canAnalyzeTender(supabase, workspaceId);
+  if (!allowed) {
+    throw new Error(reason || "Tender analysis entitlement exceeded. Please upgrade your plan.");
+  }
+
   // 1. Fetch remote content safely
   const fetchResult = await fetchSafeTenderUrl(url);
   if (!fetchResult.ok || !fetchResult.text) {
@@ -302,6 +309,10 @@ export async function ingestTenderFromUrl(args: {
       force: true,
     });
 
+    if (analysisResult && analysisResult.ok) {
+      await recordAnalysisUsage(supabase, workspaceId, opportunity.id, userId);
+    }
+
     return {
       opportunityId: opportunity.id,
       analysis: analysisResult,
@@ -341,6 +352,13 @@ export async function ingestTenderFromUpload(args: {
     customTitle,
     buyer,
   } = args;
+
+  // 0. Enforce server-authoritative billing entitlements
+  const { canAnalyzeTender, recordAnalysisUsage } = await import("./billing/entitlements.server");
+  const { allowed, reason } = await canAnalyzeTender(supabase, workspaceId);
+  if (!allowed) {
+    throw new Error(reason || "Tender analysis entitlement exceeded. Please upgrade your plan.");
+  }
 
   // 1. Download file from private documents bucket
   const { data: fileData, error: downloadErr } = await supabase.storage
@@ -413,6 +431,10 @@ export async function ingestTenderFromUpload(args: {
       opportunityId: opportunity.id,
       force: true,
     });
+
+    if (analysisResult && analysisResult.ok) {
+      await recordAnalysisUsage(supabase, workspaceId, opportunity.id, userId);
+    }
 
     return {
       opportunityId: opportunity.id,

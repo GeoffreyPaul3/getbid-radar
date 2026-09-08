@@ -19,3 +19,29 @@ export function calculateProfileCompleteness(profile: CompanyProfile | null): nu
   const passed = checks.filter(Boolean).length;
   return Math.round((passed / checks.length) * 100);
 }
+
+/**
+ * Formats a raw numeric or partial string into a comma-separated thousands string (e.g. 100000 -> 100,000)
+ * suitable for real-time keystroke entry.
+ */
+export function formatNumberWithCommas(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  const cleaned = String(value).replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+
+  const parts = cleaned.split(".");
+  const intPart = parts[0];
+  const formattedInt = intPart ? Number(intPart).toLocaleString("en-US") : "";
+
+  if (parts.length > 1 && parts[1] !== undefined) {
+    return `${formattedInt}.${parts[1].slice(0, 2)}`;
+  }
+  return formattedInt;
+}
+
+export function parseFormattedNumber(value: string): number | "" {
+  const cleaned = value.replace(/,/g, "").trim();
+  if (cleaned === "" || isNaN(Number(cleaned))) return "";
+  return Number(cleaned);
+}
+

@@ -10,9 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, Shield, Sparkles, Loader2, Save, Gauge } from "lucide-react";
+import { Building2, Users, Shield, Sparkles, Loader2, Save, Gauge, CreditCard, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 import type { Database } from "@/integrations/supabase/types";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/lib/profile-utils";
+import { PLAN_CONFIGS, formatBillingAmount } from "@/lib/billing/plans";
+import { getWorkspaceBillingFn } from "@/lib/billing/billing.functions";
 
 type WorkspaceMember = Database["public"]["Tables"]["workspace_members"]["Row"];
 
@@ -35,6 +39,8 @@ function SettingsPage() {
   const [yearsInOperation, setYearsInOperation] = useState<number | "">("");
   const [minContractValue, setMinContractValue] = useState<number | "">("");
   const [maxContractValue, setMaxContractValue] = useState<number | "">("");
+  const [minContractDisplay, setMinContractDisplay] = useState("");
+  const [maxContractDisplay, setMaxContractDisplay] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [preferredIndustries, setPreferredIndustries] = useState("");
   const [preferredRegions, setPreferredRegions] = useState("");
@@ -43,6 +49,8 @@ function SettingsPage() {
   // Team State
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [billingContext, setBillingContext] = useState<any>(null);
+  const [loadingBilling, setLoadingBilling] = useState(false);
 
   useEffect(() => {
     if (companyProfile) {
@@ -53,12 +61,12 @@ function SettingsPage() {
       setWebsite(companyProfile.website || "");
       setEmployeeCount(companyProfile.employee_count ?? "");
       setYearsInOperation(companyProfile.years_in_operation ?? "");
-      setMinContractValue(
-        companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "",
-      );
-      setMaxContractValue(
-        companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "",
-      );
+      const minVal = companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
+      const maxVal = companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
+      setMinContractValue(minVal);
+      setMaxContractValue(maxVal);
+      setMinContractDisplay(minVal === "" ? "" : Number(minVal).toLocaleString());
+      setMaxContractDisplay(maxVal === "" ? "" : Number(maxVal).toLocaleString());
       setCurrency(companyProfile.currency || "USD");
       setPreferredIndustries((companyProfile.preferred_industries || []).join(", "));
       setPreferredRegions((companyProfile.preferred_regions || []).join(", "));
@@ -85,6 +93,23 @@ function SettingsPage() {
     }
 
     loadMembers();
+  }, [workspace]);
+
+  useEffect(() => {
+    async function loadBilling() {
+      if (!workspace) return;
+      setLoadingBilling(true);
+      try {
+        const data = await getWorkspaceBillingFn({ data: { workspaceId: workspace.id } });
+        setBillingContext(data);
+      } catch (err) {
+        console.error("[Settings] Billing load error:", err);
+      } finally {
+        setLoadingBilling(false);
+      }
+    }
+
+    loadBilling();
   }, [workspace]);
 
   const parseArrayInput = (val: string): string[] =>
@@ -163,12 +188,15 @@ function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full sm:w-80 grid-cols-2 bg-secondary/80">
+          <TabsList className="grid w-full sm:w-[460px] grid-cols-3 bg-secondary/80">
             <TabsTrigger value="company" className="text-xs font-medium flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" /> Company Profile
             </TabsTrigger>
             <TabsTrigger value="team" className="text-xs font-medium flex items-center gap-2">
-              <Users className="h-3.5 w-3.5" /> Team & Workspace
+              <Users className="h-3.5 w-3.5" /> Team
+            </TabsTrigger>
+            <TabsTrigger value="billing" className="text-xs font-medium flex items-center gap-2">
+              <CreditCard className="h-3.5 w-3.5" /> Billing & Plan
             </TabsTrigger>
           </TabsList>
 
@@ -289,11 +317,15 @@ function SettingsPage() {
                       </Label>
                       <Input
                         id="s-min"
-                        type="number"
-                        value={minContractValue}
-                        onChange={(e) =>
-                          setMinContractValue(e.target.value === "" ? "" : Number(e.target.value))
-                        }
+                        type="text"
+                        inputMode="numeric"
+                        value={minContractDisplay}
+                        placeholder="e.g. 50,000"
+                        onChange={(e) => {
+                          const formatted = formatNumberWithCommas(e.target.value);
+                          setMinContractDisplay(formatted);
+                          setMinContractValue(parseFormattedNumber(formatted));
+                        }}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -302,11 +334,15 @@ function SettingsPage() {
                       </Label>
                       <Input
                         id="s-max"
-                        type="number"
-                        value={maxContractValue}
-                        onChange={(e) =>
-                          setMaxContractValue(e.target.value === "" ? "" : Number(e.target.value))
-                        }
+                        type="text"
+                        inputMode="numeric"
+                        value={maxContractDisplay}
+                        placeholder="e.g. 5,000,000"
+                        onChange={(e) => {
+                          const formatted = formatNumberWithCommas(e.target.value);
+                          setMaxContractDisplay(formatted);
+                          setMaxContractValue(parseFormattedNumber(formatted));
+                        }}
                       />
                     </div>
                   </div>
@@ -437,6 +473,122 @@ function SettingsPage() {
                       </Badge>
                     </div>
                   ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 3: Billing & Subscription Intelligence */}
+          <TabsContent value="billing" className="mt-4 space-y-6">
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-display text-lg flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-accent" /> Active Subscription & Commercial Entitlement
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Deterministic capacity management and PayChangu commercial billing integration.
+                  </CardDescription>
+                </div>
+                <Button asChild size="sm" className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 gap-1.5 shadow-sm">
+                  <Link to="/billing">
+                    Manage Subscription <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-6">
+                {loadingBilling ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Plan</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-display text-lg font-bold text-foreground">
+                            {billingContext?.planConfig?.name || (workspace?.plan ? workspace.plan.toUpperCase() : "TRIAL")}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`font-mono text-[10px] uppercase ${
+                              workspace?.subscription_status === "active"
+                                ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                                : "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                            }`}
+                          >
+                            {workspace?.subscription_status || "trialing"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {billingContext?.planConfig?.tagline || "Enterprise qualification tier"}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Analysis Allowance</span>
+                        <div className="font-display text-lg font-bold text-foreground">
+                          {billingContext?.analysesAllowance === -1 ? "Unlimited" : `${billingContext?.analysesUsed ?? 0} / ${billingContext?.analysesAllowance ?? 3}`}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {billingContext?.analysesAllowance === -1
+                            ? "Continuous AI qualification pipeline"
+                            : `${billingContext?.remainingAnalyses ?? 0} analyses remaining this period`}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Evaluation / Renewal</span>
+                        <div className="font-display text-lg font-bold text-foreground">
+                          {workspace?.trial_ends_at
+                            ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                            : "Monthly Active"}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {billingContext?.isTrialExpired
+                            ? "Evaluation period ended. Paid upgrade required."
+                            : "Server-authoritative billing entitlement"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-border/60 bg-card space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-foreground">Monthly Capacity Utilization</span>
+                        <span className="font-mono text-muted-foreground">
+                          {billingContext?.analysesAllowance === -1
+                            ? "Unlimited Allocation"
+                            : `${Math.round(((billingContext?.analysesUsed ?? 0) / Math.max(1, billingContext?.analysesAllowance ?? 3)) * 100)}% Used`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-accent h-full transition-all duration-300 rounded-full"
+                          style={{
+                            width:
+                              billingContext?.analysesAllowance === -1
+                                ? "100%"
+                                : `${Math.min(100, Math.round(((billingContext?.analysesUsed ?? 0) / Math.max(1, billingContext?.analysesAllowance ?? 3)) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-accent/5 border border-accent/20">
+                      <div className="space-y-0.5">
+                        <h4 className="text-sm font-semibold text-foreground">Upgrade or Switch Commercial Plan</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Upgrade to Growth or Pro Enterprise with instant checkout via PayChangu (MWK / USD).
+                        </p>
+                      </div>
+                      <Button asChild size="sm" className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 shadow-sm shrink-0">
+                        <Link to="/billing">
+                          View All Plans & Upgrade →
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

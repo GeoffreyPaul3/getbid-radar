@@ -26,6 +26,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/lib/profile-utils";
 
 export const Route = createFileRoute("/onboarding")({
   component: OnboardingPage,
@@ -55,6 +56,8 @@ function OnboardingPage() {
   const [yearsInOperation, setYearsInOperation] = useState<number | "">("");
   const [minContractValue, setMinContractValue] = useState<number | "">("");
   const [maxContractValue, setMaxContractValue] = useState<number | "">("");
+  const [minContractDisplay, setMinContractDisplay] = useState("");
+  const [maxContractDisplay, setMaxContractDisplay] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [preferredIndustries, setPreferredIndustries] = useState("");
   const [preferredRegions, setPreferredRegions] = useState("");
@@ -70,12 +73,12 @@ function OnboardingPage() {
       setWebsite(companyProfile.website || "");
       setEmployeeCount(companyProfile.employee_count ?? "");
       setYearsInOperation(companyProfile.years_in_operation ?? "");
-      setMinContractValue(
-        companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "",
-      );
-      setMaxContractValue(
-        companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "",
-      );
+      const minVal = companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
+      const maxVal = companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
+      setMinContractValue(minVal);
+      setMaxContractValue(maxVal);
+      setMinContractDisplay(minVal === "" ? "" : Number(minVal).toLocaleString());
+      setMaxContractDisplay(maxVal === "" ? "" : Number(maxVal).toLocaleString());
       setCurrency(companyProfile.currency || "USD");
       setPreferredIndustries((companyProfile.preferred_industries || []).join(", "));
       setPreferredRegions((companyProfile.preferred_regions || []).join(", "));
@@ -431,13 +434,15 @@ function OnboardingPage() {
                       </Label>
                       <Input
                         id="c-min"
-                        type="number"
-                        min={0}
-                        value={minContractValue}
-                        onChange={(e) =>
-                          setMinContractValue(e.target.value === "" ? "" : Number(e.target.value))
-                        }
-                        placeholder="e.g. 50000"
+                        type="text"
+                        inputMode="numeric"
+                        value={minContractDisplay}
+                        placeholder="e.g. 50,000"
+                        onChange={(e) => {
+                          const formatted = formatNumberWithCommas(e.target.value);
+                          setMinContractDisplay(formatted);
+                          setMinContractValue(parseFormattedNumber(formatted));
+                        }}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -446,13 +451,15 @@ function OnboardingPage() {
                       </Label>
                       <Input
                         id="c-max"
-                        type="number"
-                        min={0}
-                        value={maxContractValue}
-                        onChange={(e) =>
-                          setMaxContractValue(e.target.value === "" ? "" : Number(e.target.value))
-                        }
-                        placeholder="e.g. 5000000"
+                        type="text"
+                        inputMode="numeric"
+                        value={maxContractDisplay}
+                        placeholder="e.g. 5,000,000"
+                        onChange={(e) => {
+                          const formatted = formatNumberWithCommas(e.target.value);
+                          setMaxContractDisplay(formatted);
+                          setMaxContractValue(parseFormattedNumber(formatted));
+                        }}
                       />
                     </div>
                   </div>

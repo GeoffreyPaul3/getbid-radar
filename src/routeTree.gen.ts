@@ -15,6 +15,8 @@ import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as BillingIndexRouteImport } from './routes/billing.index'
+import { Route as BillingConfirmRouteImport } from './routes/billing.confirm'
 import { Route as TendersIndexRouteImport } from './routes/tenders/index'
 import { Route as TendersNewRouteImport } from './routes/tenders/new'
 import { Route as TendersIdIndexRouteImport } from './routes/tenders/$id/index'
@@ -51,6 +53,16 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingIndexRoute = BillingIndexRouteImport.update({
+  id: '/billing/',
+  path: '/billing/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BillingConfirmRoute = BillingConfirmRouteImport.update({
+  id: '/billing/confirm',
+  path: '/billing/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TendersIndexRoute = TendersIndexRouteImport.update({
   id: '/tenders/',
   path: '/tenders/',
@@ -84,7 +96,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
+  '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
+  '/billing/': typeof BillingIndexRoute
   '/tenders/': typeof TendersIndexRoute
   '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
   '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
@@ -97,7 +111,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
+  '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
+  '/billing': typeof BillingIndexRoute
   '/tenders': typeof TendersIndexRoute
   '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
   '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
@@ -111,7 +127,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
+  '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
+  '/billing/': typeof BillingIndexRoute
   '/tenders/': typeof TendersIndexRoute
   '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
   '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
@@ -126,7 +144,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/settings'
+    | '/billing/confirm'
     | '/tenders/new'
+    | '/billing/'
     | '/tenders/'
     | '/tenders/$id/requirements'
     | '/tenders/$id/workspace'
@@ -139,7 +159,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/settings'
+    | '/billing/confirm'
     | '/tenders/new'
+    | '/billing'
     | '/tenders'
     | '/tenders/$id/requirements'
     | '/tenders/$id/workspace'
@@ -152,7 +174,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/settings'
+    | '/billing/confirm'
     | '/tenders/new'
+    | '/billing/'
     | '/tenders/'
     | '/tenders/$id/requirements'
     | '/tenders/$id/workspace'
@@ -166,7 +190,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SettingsRoute: typeof SettingsRoute
+  BillingConfirmRoute: typeof BillingConfirmRoute
   TendersNewRoute: typeof TendersNewRoute
+  BillingIndexRoute: typeof BillingIndexRoute
   TendersIndexRoute: typeof TendersIndexRoute
   TendersIdRequirementsRoute: typeof TendersIdRequirementsRoute
   TendersIdWorkspaceRoute: typeof TendersIdWorkspaceRoute
@@ -217,6 +243,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing/': {
+      id: '/billing/'
+      path: '/billing'
+      fullPath: '/billing/'
+      preLoaderRoute: typeof BillingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/billing/confirm': {
+      id: '/billing/confirm'
+      path: '/billing/confirm'
+      fullPath: '/billing/confirm'
+      preLoaderRoute: typeof BillingConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tenders/': {
       id: '/tenders/'
       path: '/tenders'
@@ -262,7 +302,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SettingsRoute: SettingsRoute,
+  BillingConfirmRoute: BillingConfirmRoute,
   TendersNewRoute: TendersNewRoute,
+  BillingIndexRoute: BillingIndexRoute,
   TendersIndexRoute: TendersIndexRoute,
   TendersIdRequirementsRoute: TendersIdRequirementsRoute,
   TendersIdWorkspaceRoute: TendersIdWorkspaceRoute,
