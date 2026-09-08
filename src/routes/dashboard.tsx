@@ -27,6 +27,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
 type OpportunityAnalysis = Database["public"]["Tables"]["opportunity_analyses"]["Row"];
+type ActivityLog = Database["public"]["Tables"]["activity_logs"]["Row"];
 
 interface DashboardOpportunity extends Opportunity {
   latest_analysis?: OpportunityAnalysis | null;
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/dashboard")({
 function DashboardPage() {
   const { workspace, companyProfile, completenessScore } = useWorkspace();
   const [opportunities, setOpportunities] = useState<DashboardOpportunity[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -53,6 +55,16 @@ function DashboardPage() {
           .order("created_at", { ascending: false });
 
         if (oppErr) throw oppErr;
+
+        // Fetch recent activity logs
+        const { data: logs } = await supabase
+          .from("activity_logs")
+          .select("*")
+          .eq("workspace_id", workspace.id)
+          .order("created_at", { ascending: false })
+          .limit(8);
+
+        setActivityLogs(logs ?? []);
 
         if (!opps || opps.length === 0) {
           setOpportunities([]);
@@ -339,6 +351,45 @@ function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Real Activity Stream */}
+        {activityLogs.length > 0 && (
+          <Card className="border border-border/80 shadow-panel bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-display text-base">
+                Recent Audit & Pipeline Activity
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Immutable event stream logged by the workspace qualification engine.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                {activityLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-lg border border-border/60 bg-surface/30 flex items-center justify-between gap-3"
+                  >
+                    <div className="space-y-0.5 truncate">
+                      <span className="font-mono font-bold text-[11px] uppercase text-accent truncate block">
+                        {log.action.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground truncate block">
+                        Resource: {log.resource_type || "pipeline"} • {log.resource_id?.slice(0, 8)}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                      {new Date(log.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </AppShell>

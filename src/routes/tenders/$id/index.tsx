@@ -33,6 +33,7 @@ import {
   Sparkles,
   ExternalLink,
   ShieldAlert,
+  ListTodo,
 } from "lucide-react";
 import { analyzeOpportunity, getAnalysis } from "@/lib/analysis/analysis.functions";
 import { toast } from "sonner";
@@ -231,6 +232,7 @@ function IntelligenceReportPage() {
   const risks = (analysis?.risks as string[]) || [];
   const missingEvidence = (analysis?.missing_evidence as string[]) || [];
   const openQuestions = (analysis?.open_questions as string[]) || [];
+  const requiredActions = (analysis?.required_actions as string[]) || [];
 
   return (
     <AppShell>
@@ -442,30 +444,11 @@ function IntelligenceReportPage() {
                       {rec === "no_bid" && <XCircle className="h-4 w-4" />}
                       {rec?.toUpperCase()}
                     </Badge>
-
-                    {/* Human Override Badge if applicable */}
-                    {humanOverride && (
-                      <Badge
-                        variant="outline"
-                        className="font-mono text-xs border-accent text-accent"
-                      >
-                        Human Override: {humanOverride.toUpperCase()}
-                      </Badge>
-                    )}
                   </div>
 
                   <p className="text-base md:text-lg font-medium text-foreground leading-relaxed max-w-3xl">
                     {analysis?.reasoning || "Tender qualification scoring complete."}
                   </p>
-
-                  {analysis?.human_override_reason && (
-                    <div className="p-3 rounded-lg bg-card/60 border border-border/60 text-xs space-y-1">
-                      <span className="font-mono uppercase font-bold text-accent">
-                        Human Decision Rationale:
-                      </span>
-                      <p className="text-muted-foreground">{analysis.human_override_reason}</p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Score & Confidence Metric Box */}
@@ -495,89 +478,176 @@ function IntelligenceReportPage() {
                 </div>
               </div>
 
-              {/* Human Decision Action Bar */}
-              <div className="mt-6 pt-4 border-t border-border/40 flex flex-wrap items-center justify-between gap-4">
-                <span className="text-xs text-muted-foreground font-mono">
-                  Engine Version: {analysis?.engine_version || "v2.0"} • Analysis #
-                  {analysis?.version}
+              <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                <span>Deterministic Scoring Engine • Version {analysis?.version}</span>
+                <span>
+                  Idempotent Fingerprint: {analysis?.inputs_fingerprint?.slice(0, 8) || "active"}
                 </span>
-
-                <Dialog open={overrideModalOpen} onOpenChange={setOverrideModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="font-mono text-xs">
-                      Record Human Pursuit Decision
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="font-display text-lg">
-                        Record Pursuit Decision
-                      </DialogTitle>
-                      <DialogDescription className="text-xs">
-                        The AI recommendation is preserved. Record your organization&apos;s human
-                        decision and rationale.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold">Decision</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: "bid", label: "PURSUE BID", color: "border-bid text-bid" },
-                            { id: "review", label: "REVIEW", color: "border-review text-review" },
-                            { id: "no_bid", label: "NO-BID", color: "border-nobid text-nobid" },
-                          ].map((d) => (
-                            <button
-                              key={d.id}
-                              type="button"
-                              onClick={() =>
-                                setSelectedDecision(d.id as "bid" | "review" | "no_bid")
-                              }
-                              className={`p-2 rounded-lg border text-xs font-mono font-bold transition-all ${
-                                selectedDecision === d.id
-                                  ? `${d.color} bg-secondary shadow-sm`
-                                  : "border-border text-muted-foreground hover:bg-surface"
-                              }`}
-                            >
-                              {d.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold">
-                          Pursuit Rationale / Business Justification
-                        </label>
-                        <Textarea
-                          required
-                          value={overrideReason}
-                          onChange={(e) => setOverrideReason(e.target.value)}
-                          placeholder="e.g. Approved by Bid Committee due to strategic client expansion and qualified subcontractor partnership."
-                          rows={4}
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setOverrideModalOpen(false)}
-                        disabled={isSavingDecision}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveHumanDecision} disabled={isSavingDecision}>
-                        {isSavingDecision ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                        ) : null}
-                        Commit Decision
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
+
+            {/* 2. DEDICATED HUMAN PURSUIT DECISION CARD (Decoupled from AI) */}
+            <div className="rounded-xl border border-border bg-card p-5 shadow-panel flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-3xl">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-mono uppercase font-bold text-foreground">
+                    Team Pursuit Decision
+                  </span>
+                  {humanOverride ? (
+                    <Badge
+                      className={`font-mono text-xs uppercase font-extrabold ${
+                        humanOverride === "bid"
+                          ? "bg-bid text-bid-foreground"
+                          : humanOverride === "no_bid"
+                            ? "bg-nobid text-nobid-foreground"
+                            : "bg-review text-review-foreground"
+                      }`}
+                    >
+                      {humanOverride === "bid"
+                        ? "PURSUING CONTRACT"
+                        : humanOverride === "no_bid"
+                          ? "ABANDONED (NO-BID)"
+                          : "UNDER REVIEW"}
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-[10px] text-muted-foreground border-muted-foreground/30"
+                    >
+                      PENDING HUMAN COMMITTEE DECISION
+                    </Badge>
+                  )}
+                </div>
+
+                {analysis?.human_override_reason ? (
+                  <p className="text-xs text-foreground leading-relaxed bg-surface/60 p-2.5 rounded-lg border border-border/60">
+                    <span className="font-mono font-bold text-accent uppercase text-[10px] block mb-0.5">
+                      Pursuit Rationale / Business Justification:
+                    </span>
+                    {analysis.human_override_reason}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    The AI recommendation provides analytical intelligence. Record your
+                    organization's formal pursuit decision to transition this tender into bid
+                    preparation.
+                  </p>
+                )}
+
+                {analysis?.human_override_at && (
+                  <p className="text-[10px] font-mono text-muted-foreground">
+                    Decision logged on {new Date(analysis.human_override_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+
+              <Dialog open={overrideModalOpen} onOpenChange={setOverrideModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs shrink-0 self-start md:self-center"
+                  >
+                    {humanOverride ? "Update Decision" : "Record Pursuit Decision"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="font-display text-lg">
+                      Record Pursuit Decision
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                      The AI recommendation ({rec?.toUpperCase()}) remains archived and
+                      authoritative. Record your team's decision and business rationale.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold">Decision</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "bid", label: "PURSUE BID", color: "border-bid text-bid" },
+                          { id: "review", label: "REVIEW", color: "border-review text-review" },
+                          { id: "no_bid", label: "NO-BID", color: "border-nobid text-nobid" },
+                        ].map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setSelectedDecision(d.id as "bid" | "review" | "no_bid")}
+                            className={`p-2 rounded-lg border text-xs font-mono font-bold transition-all ${
+                              selectedDecision === d.id
+                                ? `${d.color} bg-secondary shadow-sm`
+                                : "border-border text-muted-foreground hover:bg-surface"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold">
+                        Pursuit Rationale / Business Justification
+                      </label>
+                      <Textarea
+                        required
+                        value={overrideReason}
+                        onChange={(e) => setOverrideReason(e.target.value)}
+                        placeholder="e.g. Approved by Bid Committee due to strategic client expansion and qualified subcontractor partnership."
+                        rows={4}
+                        className="text-xs"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setOverrideModalOpen(false)}
+                      disabled={isSavingDecision}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveHumanDecision} disabled={isSavingDecision}>
+                      {isSavingDecision ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      ) : null}
+                      Commit Decision
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* 3. Executive Decision Summary */}
+            {analysis?.executive_summary && (
+              <Card className="border border-border/80 shadow-panel bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2 text-foreground font-display font-bold text-base">
+                    <Sparkles className="h-4 w-4 text-accent" /> Executive Qualification Summary
+                  </div>
+                  <CardDescription className="text-xs">
+                    Synthesized qualification rationale, key competitive factors, and risk posture.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0 text-xs">
+                  <p className="text-foreground leading-relaxed bg-surface/40 p-4 rounded-xl border border-border/60 font-sans">
+                    {analysis.executive_summary}
+                  </p>
+
+                  {analysis.recommended_strategy && (
+                    <div className="p-3.5 rounded-xl border border-accent/20 bg-accent/5 space-y-1">
+                      <span className="font-mono text-[10px] font-bold uppercase text-accent">
+                        Recommended Bid Strategy:
+                      </span>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {analysis.recommended_strategy}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* 2. Critical Blockers (Destructive Alert if present) */}
             {blockers.length > 0 && (
@@ -814,7 +884,48 @@ function IntelligenceReportPage() {
               </Card>
             </div>
 
-            {/* 6. Action Call to Action */}
+            {/* 6. Actionable Next Steps (Ground in required_actions) */}
+            {requiredActions.length > 0 && (
+              <Card className="border border-border/80 shadow-panel bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2 text-foreground font-display font-bold text-base">
+                    <ListTodo className="h-4 w-4 text-accent" /> Actionable Next Steps (
+                    {requiredActions.length})
+                  </div>
+                  <CardDescription className="text-xs">
+                    Immediate qualification actions, evidence location tasks, and deadline
+                    confirmations recommended by the analysis.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 pt-0">
+                  {requiredActions.map((action, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg border border-border/60 bg-surface/40 text-xs leading-relaxed flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 text-accent font-mono text-[10px] font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="text-foreground">{action}</span>
+                      </div>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs font-mono shrink-0"
+                      >
+                        <Link to="/tenders/$id/workspace" params={{ id: opportunity.id }}>
+                          Create Task <ArrowRight className="h-3 w-3 ml-1" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 7. Action Call to Action */}
             <Card className="border border-border bg-card shadow-panel p-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>

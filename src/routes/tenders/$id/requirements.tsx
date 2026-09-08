@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { AppShell } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,6 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -29,7 +39,11 @@ import {
   FileText,
   Clock,
   ShieldAlert,
+  PlusCircle,
+  ExternalLink,
+  SlidersHorizontal,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
@@ -76,6 +90,7 @@ function MatchBadge({ match, status }: { match?: string | null; status?: string 
 
 function RequirementsMatrixPage() {
   const { id } = useParams({ from: "/tenders/$id/requirements" });
+  const { user } = useAuth();
   const { workspace } = useWorkspace();
 
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
@@ -86,7 +101,23 @@ function RequirementsMatrixPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [matchFilter, setMatchFilter] = useState("all");
-  const [mandatoryOnly, setMandatoryOnly] = useState(false);
+  const [importanceFilter, setImportanceFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState<
+    "all" | "mandatory" | "gaps" | "uncertain" | "deadlines"
+  >("all");
+
+  // Detail Drawer & Task Creation
+  const [selectedReq, setSelectedReq] = useState<OpportunityRequirement | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskPriority, setTaskPriority] = useState<"low" | "medium" | "high" | "critical">(
+    "medium",
+  );
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
 
   useEffect(() => {
     async function loadRequirements() {
@@ -122,7 +153,6 @@ function RequirementsMatrixPage() {
     loadRequirements();
   }, [id, workspace]);
 
-  // Extract distinct categories
   const categories = Array.from(
     new Set(requirements.map((r) => r.category || r.req_type).filter(Boolean)),
   );
@@ -132,7 +162,8 @@ function RequirementsMatrixPage() {
       !searchQuery.trim() ||
       r.requirement.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (r.reasoning && r.reasoning.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (r.evidence && r.evidence.toLowerCase().includes(searchQuery.toLowerCase()));
+      (r.evidence && r.evidence.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (r.source_section && r.source_section.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const catMatches =
       categoryFilter === "all" || r.category === categoryFilter || r.req_type === categoryFilter;
@@ -147,9 +178,19 @@ function RequirementsMatrixPage() {
       (matchFilter === "UNKNOWN" &&
         (normMatch === "UNKNOWN" || normMatch === "NEEDS_REVIEW" || !normMatch));
 
-    const mandatoryPass = !mandatoryOnly || Boolean(r.is_mandatory);
+    const impMatches =
+      importanceFilter === "all" || r.importance.toLowerCase() === importanceFilter.toLowerCase();
 
-    return textMatches && catMatches && matchFilterPass && mandatoryPass;
+    let scopeMatches = true;
+    if (scopeFilter === "mandatory") scopeMatches = Boolean(r.is_mandatory);
+    else if (scopeFilter === "gaps")
+      scopeMatches = normMatch === "NO_MATCH" || normMatch === "FAIL" || normMatch === "MISSING";
+    else if (scopeFilter === "uncertain")
+      scopeMatches =
+        normMatch === "UNKNOWN" || normMatch === "NEEDS_REVIEW" || Boolean(r.is_ambiguous);
+    else if (scopeFilter === "deadlines") scopeMatches = Boolean(r.due_date);
+
+    return textMatches && catMatches && matchFilterPass && impMatches && scopeMatches;
   });
 
   const matchCount = requirements.filter((r) => {
@@ -164,6 +205,76 @@ function RequirementsMatrixPage() {
     return m === "NO_MATCH" || m === "FAIL" || m === "MISSING";
   }).length;
   const unknownCount = requirements.length - matchCount - partialCount - noMatchCount;
+
+  const handleOpenDetail = (req: OpportunityRequirement) => {
+    setSelectedReq(req);
+    setDetailModalOpen(true);
+  };
+
+  const handleOpenCreateTask = (req: OpportunityRequirement) => {
+    setSelectedReq(req);
+    setTaskTitle(`Address requirement: ${req.requirement.slice(0, 60)}`);
+    setTaskDescription(
+      req.action_required ||
+        req.evidence_needed ||
+        `Verify evidence and prepare compliance response for clause.`,
+    );
+    setTaskPriority(
+      req.importance === "critical" ? "critical" : req.importance === "high" ? "high" : "medium",
+    );
+    setTaskDueDate(req.due_date ? req.due_date.slice(0, 10) : "");
+    setCreateTaskModalOpen(true);
+  };
+
+  const handleCreateTaskForReq = async () => {
+    if (!selectedReq || !workspace || !opportunity) return;
+    setIsCreatingTask(true);
+    try {
+      let bwId: string | null = null;
+      const { data: existingBw } = await supabase
+        .from("bid_workspaces")
+        .select("id")
+        .eq("opportunity_id", opportunity.id)
+        .maybeSingle();
+
+      if (existingBw) {
+        bwId = existingBw.id;
+      } else {
+        const { data: newBw, error: bwErr } = await supabase
+          .from("bid_workspaces")
+          .insert({
+            workspace_id: workspace.id,
+            opportunity_id: opportunity.id,
+            status: "preparing",
+          })
+          .select("id")
+          .single();
+        if (bwErr) throw bwErr;
+        bwId = newBw.id;
+      }
+
+      const { error: taskErr } = await supabase.from("bid_tasks").insert({
+        workspace_id: workspace.id,
+        bid_workspace_id: bwId,
+        requirement_id: selectedReq.id,
+        title: taskTitle.trim() || `Address requirement: ${selectedReq.requirement.slice(0, 60)}`,
+        description: taskDescription.trim() || null,
+        priority: taskPriority,
+        status: "todo",
+        due_date: taskDueDate || null,
+      });
+
+      if (taskErr) throw taskErr;
+
+      toast.success("Task created in Bid Workspace and linked to requirement!");
+      setCreateTaskModalOpen(false);
+      setDetailModalOpen(false);
+    } catch (err) {
+      toast.error("Failed to create task", { description: (err as Error).message });
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -243,52 +354,88 @@ function RequirementsMatrixPage() {
         </div>
 
         {/* Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search extracted clauses, evidence, or keywords..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-card text-xs"
-            />
+        <div className="space-y-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search extracted clauses, evidence, or keywords..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-10 bg-card text-xs"
+              />
+            </div>
+
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full md:w-44 h-10 bg-card text-xs">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c!} value={c!}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={matchFilter} onValueChange={setMatchFilter}>
+              <SelectTrigger className="w-full md:w-44 h-10 bg-card text-xs">
+                <SelectValue placeholder="Compliance Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="MATCH">MATCH</SelectItem>
+                <SelectItem value="PARTIAL">PARTIAL</SelectItem>
+                <SelectItem value="NO_MATCH">NO_MATCH</SelectItem>
+                <SelectItem value="UNKNOWN">UNKNOWN</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={importanceFilter} onValueChange={setImportanceFilter}>
+              <SelectTrigger className="w-full md:w-36 h-10 bg-card text-xs">
+                <SelectValue placeholder="Importance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Importance</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full md:w-44 h-10 bg-card text-xs">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c!} value={c!}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={matchFilter} onValueChange={setMatchFilter}>
-            <SelectTrigger className="w-full md:w-44 h-10 bg-card text-xs">
-              <SelectValue placeholder="Compliance Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="MATCH">MATCH</SelectItem>
-              <SelectItem value="PARTIAL">PARTIAL</SelectItem>
-              <SelectItem value="NO_MATCH">NO_MATCH</SelectItem>
-              <SelectItem value="UNKNOWN">UNKNOWN</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant={mandatoryOnly ? "default" : "outline"}
-            size="sm"
-            onClick={() => setMandatoryOnly(!mandatoryOnly)}
-            className="h-10 text-xs font-mono shrink-0"
-          >
-            Mandatory Only
-          </Button>
+          {/* Quick Scope Filters */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1 mr-1">
+              <SlidersHorizontal className="h-3 w-3" /> Focus:
+            </span>
+            {[
+              { id: "all", label: "All Clauses" },
+              { id: "mandatory", label: "Mandatory Only" },
+              { id: "gaps", label: "Confirmed Gaps (NO_MATCH)" },
+              { id: "uncertain", label: "Uncertain / Ambiguous" },
+              { id: "deadlines", label: "Deadline Sensitive" },
+            ].map((scope) => (
+              <button
+                key={scope.id}
+                onClick={() =>
+                  setScopeFilter(
+                    scope.id as "all" | "mandatory" | "gaps" | "uncertain" | "deadlines",
+                  )
+                }
+                className={`px-2.5 py-1 rounded-full text-xs font-mono transition-all ${
+                  scopeFilter === scope.id
+                    ? "bg-primary text-primary-foreground font-bold shadow-sm"
+                    : "bg-surface text-muted-foreground hover:bg-secondary hover:text-foreground border border-border/60"
+                }`}
+              >
+                {scope.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Requirements List */}
@@ -305,7 +452,7 @@ function RequirementsMatrixPage() {
             </p>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filtered.map((req) => {
               const isMandatory = req.is_mandatory;
               const sourceRef = [
@@ -319,9 +466,10 @@ function RequirementsMatrixPage() {
               return (
                 <div
                   key={req.id}
-                  className={`p-5 rounded-xl border bg-card shadow-sm transition-all hover:border-accent/40 ${
+                  className={`p-5 rounded-xl border bg-card shadow-sm transition-all hover:border-accent/40 cursor-pointer ${
                     isMandatory ? "border-l-4 border-l-accent" : "border-border/80"
                   }`}
+                  onClick={() => handleOpenDetail(req)}
                 >
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -330,7 +478,7 @@ function RequirementsMatrixPage() {
                       {isMandatory && (
                         <Badge
                           variant="destructive"
-                          className="font-mono text-[9px] py-0 px-1.5 uppercase"
+                          className="font-mono text-[9px] py-0 px-1.5 uppercase font-bold"
                         >
                           Mandatory Blocker
                         </Badge>
@@ -339,6 +487,18 @@ function RequirementsMatrixPage() {
                       {req.category && (
                         <span className="font-mono text-[10px] uppercase bg-secondary px-2 py-0.5 rounded text-foreground font-medium">
                           {req.category}
+                        </span>
+                      )}
+
+                      {req.importance && (
+                        <span
+                          className={`font-mono text-[10px] uppercase px-1.5 py-0.5 rounded border ${
+                            req.importance === "critical"
+                              ? "border-destructive/40 text-destructive bg-destructive/5"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          {req.importance}
                         </span>
                       )}
 
@@ -351,7 +511,7 @@ function RequirementsMatrixPage() {
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono shrink-0">
                       {req.match_confidence != null && (
-                        <span>Conf: {Math.round(Number(req.match_confidence) * 100)}%</span>
+                        <span>Confidence: {Math.round(Number(req.match_confidence) * 100)}%</span>
                       )}
                       {sourceRef && (
                         <span className="flex items-center gap-1 text-[11px] bg-secondary/60 px-1.5 py-0.5 rounded">
@@ -380,7 +540,7 @@ function RequirementsMatrixPage() {
                     {req.evidence && (
                       <div className="space-y-1">
                         <span className="font-mono uppercase text-[10px] font-bold text-bid flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" /> Verified Corporate Evidence:
+                          <CheckCircle2 className="h-3 w-3" /> Verified Evidence:
                         </span>
                         <p className="text-foreground leading-relaxed bg-surface/50 p-2 rounded border border-border/40 font-mono text-[11px]">
                           {req.evidence}
@@ -391,7 +551,7 @@ function RequirementsMatrixPage() {
                     {req.evidence_needed && (
                       <div className="space-y-1">
                         <span className="font-mono uppercase text-[10px] font-bold text-accent flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" /> Missing Evidence Required:
+                          <AlertTriangle className="h-3 w-3" /> Missing Evidence:
                         </span>
                         <p className="text-muted-foreground leading-relaxed bg-accent/5 p-2 rounded border border-accent/20">
                           {req.evidence_needed}
@@ -411,17 +571,21 @@ function RequirementsMatrixPage() {
                     )}
                   </div>
 
-                  {/* Task CTA */}
-                  <div className="mt-3 pt-2 border-t border-border/30 flex justify-end">
+                  {/* Action Bar */}
+                  <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-accent">
+                      Click to inspect full audit trace & citation
+                    </span>
                     <Button
-                      asChild
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenCreateTask(req);
+                      }}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground font-mono"
                     >
-                      <Link to="/tenders/$id/workspace" params={{ id: id || "" }}>
-                        Prepare Task in Workspace <ArrowRight className="h-3 w-3 ml-1" />
-                      </Link>
+                      <PlusCircle className="h-3.5 w-3.5 mr-1 text-accent" /> Create Task
                     </Button>
                   </div>
                 </div>
@@ -429,6 +593,241 @@ function RequirementsMatrixPage() {
             })}
           </div>
         )}
+
+        {/* REQUIREMENT DETAIL MODAL / DRAWER */}
+        <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            {selectedReq && (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MatchBadge match={selectedReq.company_match} status={selectedReq.status} />
+                    <span className="font-mono text-xs uppercase text-muted-foreground">
+                      {selectedReq.category || "General Requirement"}
+                    </span>
+                    {selectedReq.is_mandatory && (
+                      <Badge variant="destructive" className="font-mono text-[10px]">
+                        MANDATORY BLOCKER
+                      </Badge>
+                    )}
+                  </div>
+                  <DialogTitle className="font-display text-lg text-foreground leading-snug">
+                    {selectedReq.requirement}
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2 text-xs">
+                  {/* Tender Citation */}
+                  <div className="p-3.5 rounded-xl border border-border/80 bg-surface/60 space-y-1.5">
+                    <span className="font-mono font-bold uppercase text-[10px] text-muted-foreground flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-accent" /> Exact Tender Citation
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+                      <div>
+                        <span className="text-muted-foreground">Source:</span>{" "}
+                        <span className="font-semibold">
+                          {selectedReq.source_reference || "Tender Document"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Page:</span>{" "}
+                        <span className="font-semibold">
+                          {selectedReq.source_page ?? "Not specified"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Section:</span>{" "}
+                        <span className="font-semibold">
+                          {selectedReq.source_section ?? "General Scope"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Threshold & Interpretation */}
+                  {selectedReq.threshold_value && (
+                    <div className="p-3 rounded-lg border border-border/60 bg-card space-y-1">
+                      <span className="font-mono font-bold uppercase text-[10px] text-muted-foreground">
+                        Mandatory Specification / Threshold:
+                      </span>
+                      <p className="font-mono text-foreground">{selectedReq.threshold_value}</p>
+                    </div>
+                  )}
+
+                  {/* Company Match & Evidence */}
+                  <div className="space-y-2">
+                    <span className="font-mono font-bold uppercase text-[10px] text-foreground">
+                      Company Compliance & Evidence Trace
+                    </span>
+                    <div className="p-3 rounded-lg border border-border/60 bg-card space-y-2">
+                      <div className="flex items-center justify-between font-mono text-[11px]">
+                        <span>
+                          Match Confidence:{" "}
+                          <strong>
+                            {Math.round(Number(selectedReq.match_confidence ?? 0) * 100)}%
+                          </strong>
+                        </span>
+                        <span>
+                          Extraction Confidence:{" "}
+                          <strong>
+                            {Math.round(Number(selectedReq.extraction_confidence ?? 0) * 100)}%
+                          </strong>
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {selectedReq.reasoning ||
+                          "Evaluation derived from comparison against company profile parameters."}
+                      </p>
+                      {selectedReq.evidence && (
+                        <div className="pt-2 border-t border-border/40">
+                          <span className="font-mono text-[10px] text-bid font-bold uppercase block mb-1">
+                            Verified Corporate Evidence:
+                          </span>
+                          <p className="font-mono text-[11px] text-foreground bg-surface/80 p-2 rounded border border-border/40">
+                            {selectedReq.evidence}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Evidence Gap Analysis (Truthful distinction) */}
+                  <div className="p-3.5 rounded-xl border border-accent/30 bg-accent/5 space-y-1.5">
+                    <span className="font-mono font-bold uppercase text-[10px] text-accent flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Evidence Gap Status
+                    </span>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {selectedReq.evidence_needed ? (
+                        <span>
+                          <strong>Not Found in Knowledge Base:</strong>{" "}
+                          {selectedReq.evidence_needed}
+                        </span>
+                      ) : (
+                        <span>
+                          All necessary qualification evidence has been matched against active
+                          corporate records.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Recommended Action */}
+                  {selectedReq.action_required && (
+                    <div className="p-3 rounded-lg border border-border/60 bg-card space-y-1">
+                      <span className="font-mono font-bold uppercase text-[10px] text-foreground">
+                        Recommended Next Action:
+                      </span>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {selectedReq.action_required}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+                  <Button variant="outline" size="sm" onClick={() => setDetailModalOpen(false)}>
+                    Close
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-primary text-primary-foreground font-mono text-xs"
+                    onClick={() => {
+                      setDetailModalOpen(false);
+                      handleOpenCreateTask(selectedReq);
+                    }}
+                  >
+                    <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Create Task in Workspace
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* CREATE TASK MODAL (Directly linked to requirement_id) */}
+        <Dialog open={createTaskModalOpen} onOpenChange={setCreateTaskModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-display text-lg">Create Requirement Task</DialogTitle>
+              <DialogDescription className="text-xs">
+                Link an actionable task to this tender requirement clause in the Bid Workspace.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground">Task Title</label>
+                <Input
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g. Gather ISO 27001 certificate..."
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground">Description & Instructions</label>
+                <Textarea
+                  value={taskDescription}
+                  onChange={(e) => setTaskDescription(e.target.value)}
+                  placeholder="Specific instructions or missing evidence to locate..."
+                  rows={3}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground">Priority</label>
+                  <Select
+                    value={taskPriority}
+                    onValueChange={(v: string) =>
+                      setTaskPriority(v as "low" | "medium" | "high" | "critical")
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground">Due Date</label>
+                  <Input
+                    type="date"
+                    value={taskDueDate}
+                    onChange={(e) => setTaskDueDate(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateTaskModalOpen(false)}
+                disabled={isCreatingTask}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreateTaskForReq}
+                disabled={isCreatingTask}
+                className="bg-primary text-primary-foreground font-mono text-xs"
+              >
+                {isCreatingTask ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                Create Task
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );

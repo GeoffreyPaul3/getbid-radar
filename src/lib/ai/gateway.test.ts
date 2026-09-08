@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   AI_GATEWAY_URL,
   callStructuredAi,
+  cleanSchemaForGemini,
+  maskSecrets,
   recoverJson,
   type AiCallOptions,
 } from "./gateway.server";
@@ -51,6 +53,47 @@ describe("recoverJson", () => {
 
   it("returns undefined for non-JSON string", () => {
     expect(recoverJson("I cannot fulfill this request.")).toBeUndefined();
+  });
+});
+
+describe("cleanSchemaForGemini", () => {
+  it("removes $schema and additionalProperties recursively", () => {
+    const rawSchema = {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              name: { type: "string" },
+            },
+          },
+        },
+      },
+    };
+
+    const cleaned = cleanSchemaForGemini(rawSchema) as Record<string, unknown>;
+    expect(cleaned["$schema"]).toBeUndefined();
+    const cleanedProperties = cleaned["properties"] as Record<string, Record<string, any>>;
+    const itemsProp = cleanedProperties["items"]!;
+    const itemsItems = itemsProp["items"] as Record<string, any>;
+    expect(itemsItems["additionalProperties"]).toBeUndefined();
+    expect((itemsItems["properties"] as Record<string, any>)["name"]?.["type"]).toBe("string");
+  });
+});
+
+describe("maskSecrets", () => {
+  it("redacts matching secrets from error strings", () => {
+    const result = maskSecrets("Failed to call API with key sk-1234567890", ["sk-1234567890"]);
+    expect(result).toBe("Failed to call API with key [REDACTED]");
+  });
+
+  it("handles null and short secrets safely", () => {
+    expect(maskSecrets("clean message", [null, undefined, "abc"])).toBe("clean message");
   });
 });
 
@@ -256,5 +299,144 @@ describe("callStructuredAi", () => {
       expect(result.code).toBe("timeout");
       expect(result.message).toContain("timed out");
     }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Google Gemini Provider Tests                                       */
+  /* ------------------------------------------------------------------ */
+
+  describe("Google Gemini 2.5 Flash Provider Adapter", () => {
+    it("successfully sends Gemini payload with x-goog-api-key header and parses structured output", async () => {
+      process.env["GEMINI_API_KEY"] = "ai-secret-gemini-key-999";
+      process.env["GEMINI_MODEL"] = "gemini-2.5-flash";
+
+      const mockGeminiResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({ greeting: "Hello from Gemini 2.5 Flash", count: 42 }),
+                },
+              ],
+            },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 120,
+          candidatesTokenCount: 35,
+          totalTokenCount: 155,
+        },
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockGeminiResponse,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi(baseOptions);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ greeting: "Hello from Gemini 2.5 Flash", count: 42 });
+        expect(result.usage.model).toBe("gemini-2.5-flash");
+        expect(result.usage.promptTokens).toBe(120);
+        expect(result.usage.completionTokens).toBe(35);
+        expect(result.usage.totalTokens).toBe(155);
+        expect(result.usage.attempts).toBe(1);
+      }
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "x-goog-api-key": "ai-secret-gemini-key-999",
+            "Content-Type": "application/json",
+          }),
+        }),
+      );
+
+      // Verify request body includes responseMimeType and sanitized responseSchema
+      const callArgs = fetchSpy.mock.calls[0]!;
+      const parsedBody = JSON.parse(callArgs[1].body as string);
+      expect(parsedBody.generationConfig.responseMimeType).toBe("application/json");
+      expect(parsedBody.generationConfig.responseSchema).toBeDefined();
+
+      // Masking verification
+      expect(JSON.stringify(result)).not.toContain("ai-secret-gemini-key-999");
+    });
+
+    it("handles Gemini invalid API key error without retrying", async () => {
+      process.env["GEMINI_API_KEY"] = "invalid-key-xyz";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: {
+            code: 400,
+            message: "API key not valid. Please pass a valid API key.",
+            status: "INVALID_ARGUMENT",
+          },
+        }),
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 3 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("provider_error");
+        expect(result.message).toContain("Invalid Gemini API key");
+        expect(result.usage.attempts).toBe(1);
+      }
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("maps Gemini RESOURCE_EXHAUSTED / quota exceeded to payment_required", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => ({
+          error: {
+            code: 429,
+            message: "Resource has been exhausted (e.g. check quota).",
+            status: "RESOURCE_EXHAUSTED",
+          },
+        }),
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("rate_limited");
+      }
+    });
+
+    it("masks secrets in Gemini error messages", async () => {
+      process.env["GEMINI_API_KEY"] = "super-secret-token-abcdef";
+
+      const fetchSpy = vi
+        .fn()
+        .mockRejectedValue(new Error("Connection to super-secret-token-abcdef failed"));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).not.toContain("super-secret-token-abcdef");
+        expect(result.message).toContain("[REDACTED]");
+      }
+    });
   });
 });
