@@ -13,7 +13,7 @@ const analyzeInput = z.object({
 
 export const analyzeOpportunity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => analyzeInput.parse(data))
+  .validator((data: unknown) => analyzeInput.parse(data))
   .handler(async ({ data, context }) => {
     const { runOpportunityAnalysis } = await import("./pipeline.server");
     return runOpportunityAnalysis({
@@ -26,7 +26,7 @@ export const analyzeOpportunity = createServerFn({ method: "POST" })
 
 export const getAnalysis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ opportunityId: z.string().uuid() }).parse(data))
+  .validator((data: unknown) => z.object({ opportunityId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { data: analysis, error } = await context.supabase
       .from("opportunity_analyses")

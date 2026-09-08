@@ -10,33 +10,167 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TendersIndexRouteImport } from './routes/tenders/index'
+import { Route as TendersNewRouteImport } from './routes/tenders/new'
+import { Route as TendersIdIndexRouteImport } from './routes/tenders/$id/index'
+import { Route as TendersIdRequirementsRouteImport } from './routes/tenders/$id/requirements'
+import { Route as TendersIdWorkspaceRouteImport } from './routes/tenders/$id/workspace'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersIndexRoute = TendersIndexRouteImport.update({
+  id: '/tenders/',
+  path: '/tenders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersNewRoute = TendersNewRouteImport.update({
+  id: '/tenders/new',
+  path: '/tenders/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersIdIndexRoute = TendersIdIndexRouteImport.update({
+  id: '/tenders/$id/',
+  path: '/tenders/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersIdRequirementsRoute = TendersIdRequirementsRouteImport.update({
+  id: '/tenders/$id/requirements',
+  path: '/tenders/$id/requirements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersIdWorkspaceRoute = TendersIdWorkspaceRouteImport.update({
+  id: '/tenders/$id/workspace',
+  path: '/tenders/$id/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/settings': typeof SettingsRoute
+  '/tenders/new': typeof TendersNewRoute
+  '/tenders/': typeof TendersIndexRoute
+  '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
+  '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
+  '/tenders/$id/': typeof TendersIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/settings': typeof SettingsRoute
+  '/tenders/new': typeof TendersNewRoute
+  '/tenders': typeof TendersIndexRoute
+  '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
+  '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
+  '/tenders/$id': typeof TendersIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/settings': typeof SettingsRoute
+  '/tenders/new': typeof TendersNewRoute
+  '/tenders/': typeof TendersIndexRoute
+  '/tenders/$id/requirements': typeof TendersIdRequirementsRoute
+  '/tenders/$id/workspace': typeof TendersIdWorkspaceRoute
+  '/tenders/$id/': typeof TendersIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/knowledge'
+    | '/login'
+    | '/onboarding'
+    | '/settings'
+    | '/tenders/new'
+    | '/tenders/'
+    | '/tenders/$id/requirements'
+    | '/tenders/$id/workspace'
+    | '/tenders/$id/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/knowledge'
+    | '/login'
+    | '/onboarding'
+    | '/settings'
+    | '/tenders/new'
+    | '/tenders'
+    | '/tenders/$id/requirements'
+    | '/tenders/$id/workspace'
+    | '/tenders/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/knowledge'
+    | '/login'
+    | '/onboarding'
+    | '/settings'
+    | '/tenders/new'
+    | '/tenders/'
+    | '/tenders/$id/requirements'
+    | '/tenders/$id/workspace'
+    | '/tenders/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
+  KnowledgeRoute: typeof KnowledgeRoute
+  LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
+  SettingsRoute: typeof SettingsRoute
+  TendersNewRoute: typeof TendersNewRoute
+  TendersIndexRoute: typeof TendersIndexRoute
+  TendersIdRequirementsRoute: typeof TendersIdRequirementsRoute
+  TendersIdWorkspaceRoute: typeof TendersIdWorkspaceRoute
+  TendersIdIndexRoute: typeof TendersIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +182,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/': {
+      id: '/tenders/'
+      path: '/tenders'
+      fullPath: '/tenders/'
+      preLoaderRoute: typeof TendersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/new': {
+      id: '/tenders/new'
+      path: '/tenders/new'
+      fullPath: '/tenders/new'
+      preLoaderRoute: typeof TendersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/$id/': {
+      id: '/tenders/$id/'
+      path: '/tenders/$id'
+      fullPath: '/tenders/$id/'
+      preLoaderRoute: typeof TendersIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/$id/requirements': {
+      id: '/tenders/$id/requirements'
+      path: '/tenders/$id/requirements'
+      fullPath: '/tenders/$id/requirements'
+      preLoaderRoute: typeof TendersIdRequirementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/$id/workspace': {
+      id: '/tenders/$id/workspace'
+      path: '/tenders/$id/workspace'
+      fullPath: '/tenders/$id/workspace'
+      preLoaderRoute: typeof TendersIdWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
+  KnowledgeRoute: KnowledgeRoute,
+  LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
+  SettingsRoute: SettingsRoute,
+  TendersNewRoute: TendersNewRoute,
+  TendersIndexRoute: TendersIndexRoute,
+  TendersIdRequirementsRoute: TendersIdRequirementsRoute,
+  TendersIdWorkspaceRoute: TendersIdWorkspaceRoute,
+  TendersIdIndexRoute: TendersIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
