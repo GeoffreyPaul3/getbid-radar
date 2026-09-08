@@ -1,8 +1,8 @@
 import React, { useState, useRef } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useWorkspace } from "@/lib/workspace-context";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,9 @@ import {
   Loader2,
   ShieldCheck,
   AlertCircle,
+  CheckCircle2,
+  Lock,
+  ChevronLeft,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ingestTenderUploadFn, ingestTenderUrlFn } from "@/lib/tender-intake.functions";
@@ -36,6 +39,7 @@ function NewTenderPage() {
   // Upload Tab state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // URL Tab state
@@ -45,6 +49,7 @@ function NewTenderPage() {
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0]!;
       setSelectedFile(file);
@@ -98,22 +103,21 @@ function NewTenderPage() {
           workspaceId: workspace.id,
           storagePath,
           fileName: selectedFile.name,
-          fileSize: selectedFile.size,
-          mimeType: selectedFile.type || "application/pdf",
           title: customTitle.trim() || undefined,
           buyer: buyer.trim() || undefined,
         },
       });
 
-      toast.success("Tender ingested! Analysis in progress.", { id: toastId });
+      toast.success("Tender ingested! Analysis launched.", { id: toastId });
       navigate({
         to: "/tenders/$id",
         params: { id: result.opportunityId },
       });
     } catch (err) {
-      const msg = (err as Error).message;
-      toast.error("Upload failed", { id: toastId, description: msg });
-    } finally {
+      toast.error("Upload failed", {
+        id: toastId,
+        description: (err as Error).message,
+      });
       setIsUploading(false);
     }
   };
@@ -166,61 +170,80 @@ function NewTenderPage() {
 
   return (
     <AppShell>
-      <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-6">
-        {/* Breadcrumb & Header */}
+      <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/tenders"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Back to Tenders
+          </Link>
+        </div>
+
+        {/* Title Header */}
         <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            <span>Tenders</span>
-            <span>/</span>
-            <span className="text-foreground">Intake</span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-primary">
+              Intake Channel
+            </span>
+            <span className="text-border-strong">•</span>
+            <span className="text-[11px] font-mono text-muted-foreground">Two-Mode Ingestion</span>
           </div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground">
-            Ingest New Tender
+          <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            Ingest Tender Specification
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Provide the tender document package or portal URL. The Phase 2 intelligence engine will
-            extract mandatory requirements and evaluate your bid alignment immediately.
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
+            Upload the tender document package or enter a public portal URL. Requirements will be
+            extracted and evaluated against company evidence immediately.
           </p>
         </div>
 
-        <Card className="border border-border/80 shadow-panel bg-card">
+        {/* Ingestion Card */}
+        <Card className="border border-border shadow-panel bg-surface">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "upload" | "url")}>
-            <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2 bg-secondary/80">
-                <TabsTrigger value="upload" className="font-medium text-xs flex items-center gap-2">
-                  <Upload className="h-3.5 w-3.5" /> 1. Upload Tender Package
+            <div className="p-4 sm:p-6 pb-2 border-b border-border/70">
+              <TabsList className="grid w-full grid-cols-2 bg-surface-muted p-1 rounded-lg border border-border/60">
+                <TabsTrigger
+                  value="upload"
+                  className="font-medium text-xs flex items-center justify-center gap-2 py-2 data-[state=active]:bg-surface data-[state=active]:text-primary data-[state=active]:shadow-subtle"
+                >
+                  <Upload className="h-3.5 w-3.5" /> 1. Upload Tender Document
                 </TabsTrigger>
-                <TabsTrigger value="url" className="font-medium text-xs flex items-center gap-2">
+                <TabsTrigger
+                  value="url"
+                  className="font-medium text-xs flex items-center justify-center gap-2 py-2 data-[state=active]:bg-surface data-[state=active]:text-primary data-[state=active]:shadow-subtle"
+                >
                   <Link2 className="h-3.5 w-3.5" /> 2. Paste Tender URL
                 </TabsTrigger>
               </TabsList>
-            </CardHeader>
+            </div>
 
-            <CardContent className="space-y-6 pt-2">
+            <CardContent className="p-4 sm:p-6 space-y-6">
               {/* Optional Common Metadata Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-border/40">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-border/60">
                 <div className="space-y-1.5">
-                  <Label htmlFor="tender-title" className="text-xs">
+                  <Label htmlFor="tender-title" className="text-xs font-semibold text-foreground">
                     Tender Title (Optional override)
                   </Label>
                   <Input
                     id="tender-title"
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder="Auto-extracted if blank"
-                    className="h-9 text-sm"
+                    placeholder="Auto-extracted from document if empty"
+                    className="h-9 text-xs rounded-lg border-border bg-surface"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="tender-buyer" className="text-xs">
-                    Issuing Buyer / Authority
+                  <Label htmlFor="tender-buyer" className="text-xs font-semibold text-foreground">
+                    Issuing Authority / Buyer
                   </Label>
                   <Input
                     id="tender-buyer"
                     value={buyer}
                     onChange={(e) => setBuyer(e.target.value)}
-                    placeholder="e.g. Department of Transportation"
-                    className="h-9 text-sm"
+                    placeholder="e.g. Department of Infrastructure"
+                    className="h-9 text-xs rounded-lg border-border bg-surface"
                   />
                 </div>
               </div>
@@ -229,13 +252,19 @@ function NewTenderPage() {
               <TabsContent value="upload" className="m-0 space-y-4">
                 <form onSubmit={handleUploadSubmit} className="space-y-4">
                   <div
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={() => setIsDragging(false)}
                     onDrop={handleFileDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                      selectedFile
-                        ? "border-accent bg-accent/5"
-                        : "border-border/80 hover:border-accent/60 bg-surface/40 hover:bg-surface/70"
+                    className={`border-2 border-dashed rounded-xl p-8 sm:p-10 text-center cursor-pointer transition-all duration-150 ${
+                      isDragging
+                        ? "border-primary bg-primary-soft/40"
+                        : selectedFile
+                          ? "border-primary/50 bg-primary-soft/20"
+                          : "border-border hover:border-primary/60 bg-surface-muted/30 hover:bg-surface-muted/60"
                     }`}
                   >
                     <input
@@ -248,10 +277,10 @@ function NewTenderPage() {
 
                     {selectedFile ? (
                       <div className="flex flex-col items-center gap-2">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground font-mono shadow-sm">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white shadow-subtle">
                           <FileText className="h-6 w-6" />
                         </div>
-                        <p className="font-display font-semibold text-foreground text-sm mt-1">
+                        <p className="font-display font-bold text-foreground text-sm mt-1">
                           {selectedFile.name}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono">
@@ -261,7 +290,7 @@ function NewTenderPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-xs text-muted-foreground mt-2"
+                          className="text-xs text-muted-foreground hover:text-foreground mt-2"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedFile(null);
@@ -271,38 +300,43 @@ function NewTenderPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-2.5">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-                          <Upload className="h-5 w-5 text-accent" />
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-soft text-primary shadow-subtle">
+                          <Upload className="h-6 w-6" />
                         </div>
-                        <p className="font-display font-semibold text-sm text-foreground">
-                          Click to select or drop tender package
-                        </p>
-                        <p className="text-xs text-muted-foreground max-w-sm">
-                          Supports RFP specifications, requirements schedules, and bill of
-                          quantities in PDF, DOCX, XLSX, TXT, or ZIP archives (up to 50MB).
-                        </p>
+                        <div>
+                          <p className="font-display font-bold text-sm text-foreground">
+                            Click to select or drag tender document package
+                          </p>
+                          <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
+                            Supports PDF, DOCX, XLSX, TXT, or ZIP specification packages (up to
+                            50MB).
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-                      <ShieldCheck className="h-4 w-4 text-accent" /> Isolated Private Tenant
-                      Storage
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                      <Lock className="h-3.5 w-3.5 text-bid" />
+                      <span>Private Tenant Storage Isolation</span>
                     </div>
+
                     <Button
                       type="submit"
                       disabled={!selectedFile || isUploading}
-                      className="font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="bg-primary text-white hover:bg-primary-bright shadow-subtle h-10 px-5 text-xs font-semibold"
                     >
                       {isUploading ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Ingesting & Analyzing...
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          <span>Extracting & Analyzing...</span>
                         </>
                       ) : (
                         <>
-                          Ingest & Run Intelligence <ArrowRight className="h-4 w-4 ml-1.5" />
+                          <span>Ingest & Launch Analysis</span>
+                          <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                         </>
                       )}
                     </Button>
@@ -314,63 +348,54 @@ function NewTenderPage() {
               <TabsContent value="url" className="m-0 space-y-4">
                 <form onSubmit={handleUrlSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="tender-url" className="text-xs">
-                      Public Tender Notice or Specification URL{" "}
-                      <span className="text-destructive">*</span>
+                    <Label htmlFor="tender-url" className="text-xs font-semibold text-foreground">
+                      Public Procurement Notice URL
                     </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="tender-url"
-                        type="url"
-                        required
-                        value={url}
-                        onChange={(e) => {
-                          setUrl(e.target.value);
-                          setUrlError(null);
-                        }}
-                        placeholder="https://procurement.portal.gov/tenders/notice/2026-8914"
-                        className="h-10 text-sm font-mono"
-                      />
-                    </div>
+                    <Input
+                      id="tender-url"
+                      type="url"
+                      value={url}
+                      onChange={(e) => {
+                        setUrl(e.target.value);
+                        if (urlError) setUrlError(null);
+                      }}
+                      placeholder="https://procurement.example.gov/notices/2026/tender-specification"
+                      className={`h-10 text-xs rounded-lg border-border bg-surface ${
+                        urlError ? "border-nobid focus-visible:ring-nobid" : ""
+                      }`}
+                    />
                     {urlError && (
-                      <div className="flex items-center gap-2 text-xs text-destructive mt-1">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        <span>{urlError}</span>
-                      </div>
+                      <p className="text-xs text-nobid font-medium flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        {urlError}
+                      </p>
                     )}
                     <p className="text-[11px] text-muted-foreground">
-                      Our server will safely retrieve the tender HTML or remote PDF document,
-                      extract text content, and trigger automated qualification matching.
+                      GetBidRadar safely retrieves the public notice content via server-side fetch
+                      with SSRF mitigation.
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-border/60 bg-surface/50 p-4 space-y-2 text-xs text-muted-foreground">
-                    <p className="font-semibold text-foreground flex items-center gap-1.5">
-                      <ShieldCheck className="h-4 w-4 text-accent" /> Enterprise Retrieval Security
-                    </p>
-                    <p>
-                      Remote fetching runs on isolated server runtimes with strict SSRF protection.
-                      Internal network subnets, private IP ranges, and unauthorized schemes are
-                      blocked.
-                    </p>
-                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                      <ShieldCheck className="h-3.5 w-3.5 text-bid" />
+                      <span>SSRF-Protected Request</span>
+                    </div>
 
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-muted-foreground font-mono">
-                      Phase 2 Auto-Analysis
-                    </span>
                     <Button
                       type="submit"
                       disabled={!url.trim() || isIngestingUrl}
-                      className="font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="bg-primary text-white hover:bg-primary-bright shadow-subtle h-10 px-5 text-xs font-semibold"
                     >
                       {isIngestingUrl ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Fetching & Ingesting...
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          <span>Fetching & Ingesting...</span>
                         </>
                       ) : (
                         <>
-                          Ingest & Run Intelligence <ArrowRight className="h-4 w-4 ml-1.5" />
+                          <span>Fetch & Launch Analysis</span>
+                          <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                         </>
                       )}
                     </Button>

@@ -6,7 +6,6 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -16,24 +15,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Search,
   PlusCircle,
   FileText,
   Clock,
   Building2,
-  ArrowUpRight,
+  ChevronRight,
   Loader2,
   AlertTriangle,
   CheckCircle2,
   HelpCircle,
   XCircle,
+  Briefcase,
+  X,
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -51,7 +45,7 @@ export const Route = createFileRoute("/tenders/")({
 export function RecommendationBadge({ rec }: { rec?: string | null | undefined }) {
   if (!rec) {
     return (
-      <Badge variant="outline" className="text-muted-foreground font-mono text-[11px]">
+      <Badge variant="outline" className="text-muted-foreground font-mono text-[10px] uppercase">
         PENDING
       </Badge>
     );
@@ -60,31 +54,62 @@ export function RecommendationBadge({ rec }: { rec?: string | null | undefined }
   const normalized = rec.toLowerCase();
   if (normalized === "bid") {
     return (
-      <Badge className="bg-bid text-bid-foreground font-mono font-bold text-[11px] px-2.5 py-0.5 border-0 shadow-sm flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-bid-soft text-bid border border-bid/25 text-[11px] font-mono font-bold">
         <CheckCircle2 className="h-3 w-3" /> BID
-      </Badge>
+      </span>
     );
   }
   if (normalized === "review") {
     return (
-      <Badge className="bg-review text-review-foreground font-mono font-bold text-[11px] px-2.5 py-0.5 border-0 shadow-sm flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-review-soft text-review border border-review/30 text-[11px] font-mono font-bold">
         <HelpCircle className="h-3 w-3" /> REVIEW
-      </Badge>
+      </span>
     );
   }
   if (normalized === "no_bid" || normalized === "nobid") {
     return (
-      <Badge className="bg-nobid text-nobid-foreground font-mono font-bold text-[11px] px-2.5 py-0.5 border-0 shadow-sm flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-nobid-soft text-nobid border border-nobid/25 text-[11px] font-mono font-bold">
         <XCircle className="h-3 w-3" /> NO-BID
-      </Badge>
+      </span>
     );
   }
 
   return (
-    <Badge variant="outline" className="font-mono text-[11px] uppercase">
+    <Badge variant="outline" className="font-mono text-[10px] uppercase">
       {rec}
     </Badge>
   );
+}
+
+function PursuitBadge({
+  status,
+  override,
+}: {
+  status: string;
+  override?: string | null | undefined;
+}) {
+  if (override === "bid" || status === "pursuing") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-soft text-primary border border-primary/20 text-[10px] font-mono font-semibold">
+        <Briefcase className="h-2.5 w-2.5" /> PURSUING
+      </span>
+    );
+  }
+  if (override === "no_bid" || status === "no_bid") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-muted-foreground border border-border text-[10px] font-mono">
+        ABANDONED
+      </span>
+    );
+  }
+  if (override === "review" || status === "reviewing") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-review-soft text-review border border-review/25 text-[10px] font-mono">
+        IN REVIEW
+      </span>
+    );
+  }
+  return <span className="text-[10px] font-mono text-muted-foreground">UNDECIDED</span>;
 }
 
 function TendersListPage() {
@@ -92,7 +117,9 @@ function TendersListPage() {
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState<"all" | "bid" | "review" | "no_bid" | "pursuing">(
+    "all",
+  );
 
   useEffect(() => {
     async function loadOpportunities() {
@@ -113,7 +140,6 @@ function TendersListPage() {
           return;
         }
 
-        // Fetch latest analysis for each opportunity
         const oppIds = opps.map((o) => o.id);
         const { data: analyses, error: anErr } = await supabase
           .from("opportunity_analyses")
@@ -149,109 +175,165 @@ function TendersListPage() {
       (item.buyer && item.buyer.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "analyzing" && item.analysis_status === "processing") ||
-      (statusFilter === "bid" && item.latest_analysis?.recommendation === "bid") ||
-      (statusFilter === "review" && item.latest_analysis?.recommendation === "review") ||
-      (statusFilter === "no_bid" && item.latest_analysis?.recommendation === "no_bid") ||
-      item.status === statusFilter;
+    const rec = item.latest_analysis?.recommendation?.toLowerCase();
+    const isPursuing = item.status === "pursuing" || item.latest_analysis?.human_override === "bid";
 
-    return matchesSearch && matchesStatus;
+    let matchesTab = true;
+    if (activeTab === "bid") matchesTab = rec === "bid";
+    else if (activeTab === "review") matchesTab = rec === "review";
+    else if (activeTab === "no_bid") matchesTab = rec === "no_bid" || rec === "nobid";
+    else if (activeTab === "pursuing") matchesTab = isPursuing;
+
+    return matchesSearch && matchesTab;
   });
 
   return (
     <AppShell>
-      <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground">
-              Tender Register
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-primary">
+                Contract Register
+              </span>
+              <span className="text-border-strong">•</span>
+              <span className="text-[11px] font-mono text-muted-foreground">
+                {filtered.length} of {opportunities.length} Total
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+              Evaluated Tenders & RFPs
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Active procurement notices evaluated by the deterministic qualification engine.
-            </p>
           </div>
-          <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button
+            asChild
+            className="bg-primary text-white hover:bg-primary-bright shadow-subtle h-9 text-xs"
+          >
             <Link to="/tenders/new">
-              <PlusCircle className="h-4 w-4 mr-2" /> Ingest Tender
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Ingest Tender
             </Link>
           </Button>
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        {/* Filter Controls & Search */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+          {/* Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-surface border border-border">
+            {[
+              { id: "all", label: "All Tenders", count: opportunities.length },
+              {
+                id: "bid",
+                label: "Qualified BID",
+                count: opportunities.filter((o) => o.latest_analysis?.recommendation === "bid")
+                  .length,
+              },
+              {
+                id: "review",
+                label: "REVIEW",
+                count: opportunities.filter((o) => o.latest_analysis?.recommendation === "review")
+                  .length,
+              },
+              {
+                id: "no_bid",
+                label: "NO-BID",
+                count: opportunities.filter((o) => o.latest_analysis?.recommendation === "no_bid")
+                  .length,
+              },
+              {
+                id: "pursuing",
+                label: "Pursuing",
+                count: opportunities.filter(
+                  (o) => o.status === "pursuing" || o.latest_analysis?.human_override === "bid",
+                ).length,
+              },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-primary text-white shadow-subtle font-semibold"
+                    : "text-text-secondary hover:text-foreground hover:bg-surface-muted"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                    activeTab === tab.id
+                      ? "bg-white/20 text-white"
+                      : "bg-surface-muted text-muted-foreground"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search by tender title, issuing buyer, or sector..."
+              type="text"
+              placeholder="Search tender title or buyer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-card"
+              className="pl-8 pr-8 h-9 text-xs rounded-lg border-border bg-surface"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48 h-10 bg-card">
-              <SelectValue placeholder="Filter Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tenders</SelectItem>
-              <SelectItem value="bid">Recommendation: BID</SelectItem>
-              <SelectItem value="review">Recommendation: REVIEW</SelectItem>
-              <SelectItem value="no_bid">Recommendation: NO-BID</SelectItem>
-              <SelectItem value="analyzing">Analyzing...</SelectItem>
-              <SelectItem value="pursuing">Pursuing</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
-        {/* Content Table or Empty State */}
+        {/* Operational Table */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16 bg-card rounded-xl border border-border">
-            <Loader2 className="h-8 w-8 animate-spin text-accent mb-2" />
+          <div className="flex flex-col items-center justify-center p-16 bg-surface rounded-xl border border-border">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
             <p className="text-xs text-muted-foreground font-mono">Loading tender register...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <Card className="border border-border/80 shadow-panel bg-card text-center p-12">
-            <CardContent className="space-y-4 p-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground mx-auto">
-                <FileText className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-display font-semibold text-base text-foreground">
-                  {searchQuery || statusFilter !== "all"
-                    ? "No matching tenders found"
-                    : "No tenders ingested yet"}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                  {searchQuery || statusFilter !== "all"
-                    ? "Adjust your search terms or filter criteria."
-                    : "Begin by uploading a tender document package (PDF/DOCX) or pasting a procurement portal URL."}
-                </p>
-              </div>
-              <Button asChild className="mt-2">
+          <div className="rounded-xl border border-border bg-surface p-10 text-center space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-muted text-muted-foreground mx-auto">
+              <Search className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-display font-semibold text-base text-foreground">
+                {searchQuery || activeTab !== "all"
+                  ? "No Matching Contracts Found"
+                  : "No Tenders Ingested Yet"}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                {searchQuery || activeTab !== "all"
+                  ? "Try resetting your search query or switching the status filter."
+                  : "Ingest a tender document package or public URL to view deterministic qualification results."}
+              </p>
+            </div>
+            {!(searchQuery || activeTab !== "all") && (
+              <Button asChild size="sm" className="bg-primary text-white hover:bg-primary-bright">
                 <Link to="/tenders/new">
-                  <PlusCircle className="h-4 w-4 mr-2" /> Ingest First Tender
+                  <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Ingest First Tender
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         ) : (
-          <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+          <div className="rounded-xl border border-border bg-surface shadow-subtle overflow-hidden">
             <Table>
-              <TableHeader className="bg-surface/50">
+              <TableHeader>
                 <TableRow>
-                  <TableHead className="font-mono text-xs font-semibold">
-                    Tender Title & Buyer
-                  </TableHead>
-                  <TableHead className="font-mono text-xs font-semibold">Recommendation</TableHead>
-                  <TableHead className="font-mono text-xs font-semibold">Score</TableHead>
-                  <TableHead className="font-mono text-xs font-semibold">Deadline</TableHead>
-                  <TableHead className="font-mono text-xs font-semibold">Status</TableHead>
-                  <TableHead className="font-mono text-xs font-semibold text-right">
-                    Action
-                  </TableHead>
+                  <TableHead className="w-[38%]">Tender Title & Buyer</TableHead>
+                  <TableHead className="w-[14%]">Recommendation</TableHead>
+                  <TableHead className="w-[12%]">Score</TableHead>
+                  <TableHead className="w-[12%]">Deadline</TableHead>
+                  <TableHead className="w-[12%]">Pursuit</TableHead>
+                  <TableHead className="w-[12%] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -262,57 +344,54 @@ function TendersListPage() {
                   const confidence = item.latest_analysis?.confidence;
 
                   return (
-                    <TableRow key={item.id} className="hover:bg-surface/40 transition-colors">
-                      <TableCell className="py-3.5 max-w-md">
+                    <TableRow key={item.id} className="hover:bg-surface-muted/40 transition-colors">
+                      <TableCell className="py-3">
                         <Link
                           to="/tenders/$id"
                           params={{ id: item.id }}
-                          className="font-display font-semibold text-sm text-foreground hover:text-accent transition-colors block truncate"
+                          className="font-display font-bold text-sm text-foreground hover:text-primary transition-colors block truncate"
                         >
                           {item.title}
                         </Link>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                           {item.buyer && (
                             <span className="flex items-center gap-1 truncate">
-                              <Building2 className="h-3 w-3" /> {item.buyer}
+                              <Building2 className="h-3 w-3 text-muted-foreground" /> {item.buyer}
                             </span>
                           )}
                           {item.source_type && (
-                            <span className="font-mono text-[10px] uppercase bg-secondary px-1.5 py-0.5 rounded">
+                            <span className="font-mono text-[10px] uppercase bg-surface-muted text-muted-foreground px-1.5 py-0.2 rounded border border-border/50">
                               {item.source_type}
                             </span>
                           )}
                         </div>
                       </TableCell>
 
-                      <TableCell className="py-3.5">
+                      <TableCell className="py-3">
                         {isProcessing ? (
-                          <Badge
-                            variant="outline"
-                            className="text-accent font-mono text-[11px] animate-pulse"
-                          >
-                            ANALYZING...
-                          </Badge>
+                          <span className="inline-flex items-center gap-1.5 text-primary text-xs font-mono font-semibold animate-pulse">
+                            <Loader2 className="h-3 w-3 animate-spin" /> ANALYZING...
+                          </span>
                         ) : hasAnalysis ? (
                           <RecommendationBadge rec={item.latest_analysis?.recommendation} />
                         ) : (
                           <Badge
                             variant="outline"
-                            className="text-muted-foreground text-[11px] font-mono"
+                            className="text-muted-foreground text-[10px] font-mono"
                           >
                             UNANALYZED
                           </Badge>
                         )}
                       </TableCell>
 
-                      <TableCell className="py-3.5 font-mono text-sm">
+                      <TableCell className="py-3 font-mono text-sm">
                         {score != null ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-foreground">{score}</span>
-                            <span className="text-xs text-muted-foreground">/ 100</span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-bold text-foreground text-sm">{score}</span>
+                            <span className="text-[10px] text-muted-foreground">/100</span>
                             {confidence != null && (
-                              <span className="text-[10px] text-muted-foreground">
-                                ({Math.round(Number(confidence) * 100)}% conf)
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                ({Math.round(Number(confidence) * 100)}%)
                               </span>
                             )}
                           </div>
@@ -321,27 +400,33 @@ function TendersListPage() {
                         )}
                       </TableCell>
 
-                      <TableCell className="py-3.5 text-xs text-muted-foreground font-mono">
+                      <TableCell className="py-3 text-xs text-muted-foreground font-mono">
                         {item.deadline ? (
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(item.deadline).toLocaleDateString()}
+                          <div className="flex items-center gap-1 text-foreground">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span>{new Date(item.deadline).toLocaleDateString()}</span>
                           </div>
                         ) : (
                           <span>Not stated</span>
                         )}
                       </TableCell>
 
-                      <TableCell className="py-3.5">
-                        <Badge variant="secondary" className="font-mono text-[10px] uppercase">
-                          {item.status}
-                        </Badge>
+                      <TableCell className="py-3">
+                        <PursuitBadge
+                          status={item.status}
+                          override={item.latest_analysis?.human_override}
+                        />
                       </TableCell>
 
-                      <TableCell className="py-3.5 text-right">
-                        <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                      <TableCell className="py-3 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="h-8 text-xs font-semibold"
+                        >
                           <Link to="/tenders/$id" params={{ id: item.id }}>
-                            View Report <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
+                            Intelligence <ChevronRight className="h-3 w-3 ml-0.5" />
                           </Link>
                         </Button>
                       </TableCell>
