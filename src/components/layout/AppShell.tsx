@@ -14,6 +14,7 @@ import {
   X,
   Radar,
   Sparkles,
+  FileSearch,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -27,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import logo from "@/assets/bidradar.png"
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -77,21 +79,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-5 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-2.5 group">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-subtle transition-transform duration-150 group-hover:scale-105">
-              <Radar className="h-4 w-4" />
-              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-bright opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-bright"></span>
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-display font-bold tracking-tight text-base text-foreground leading-none">
-                GetBid<span className="text-primary">Radar</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground tracking-wider font-mono uppercase mt-0.5">
-                Contract Intelligence
-              </span>
-            </div>
+             <img src={logo} width={160} height={140} alt="BidRadar" />
           </Link>
         </div>
 
@@ -147,7 +135,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="mt-2.5 px-1">
             <div className="flex items-center justify-between text-[11px] mb-1">
               <span className="text-muted-foreground flex items-center gap-1 font-medium">
-                <Sparkles className="h-3 w-3 text-primary" />
+                <FileSearch className="h-3 w-3 text-primary" />
                 Evidence Calibration
               </span>
               <span className="font-mono font-bold text-foreground">{completenessScore}%</span>
