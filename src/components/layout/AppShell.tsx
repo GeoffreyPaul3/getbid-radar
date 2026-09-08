@@ -121,10 +121,9 @@ export function AppShell({ children }: AppShellProps) {
                 <Link to="/dashboard" className="flex items-center gap-2 group overflow-hidden">
                   <img
                     src={logo}
-                    width={150}
+                    width={160}
                     height={130}
                     alt="BidRadar"
-                    className="object-contain max-h-11"
                   />
                 </Link>
                 <Button

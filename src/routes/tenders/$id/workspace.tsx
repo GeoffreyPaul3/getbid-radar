@@ -41,6 +41,7 @@ import {
   FileText,
   Building2,
   ListTodo,
+  FileBarChart,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -462,7 +463,7 @@ function BidWorkspacePage() {
             params={{ id: id || "" }}
             className="pb-3 text-muted-foreground hover:text-foreground flex items-center gap-2"
           >
-            <Sparkles className="h-4 w-4" /> Intelligence Report
+            <FileBarChart className="h-4 w-4" /> Intelligence Report
           </Link>
           <Link
             to="/tenders/$id/requirements"
