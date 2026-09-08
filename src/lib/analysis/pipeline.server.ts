@@ -258,7 +258,7 @@ async function recordUsage(
     units: args.usage.totalTokens ?? 0,
     resource_id: args.resourceId,
     metadata: {
-      provider: "lovable_ai_gateway",
+      provider: args.usage.activeProvider ?? "gemini",
       model: args.usage.model,
       input_tokens: args.usage.promptTokens ?? null,
       output_tokens: args.usage.completionTokens ?? null,

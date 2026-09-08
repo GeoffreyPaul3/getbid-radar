@@ -164,7 +164,9 @@ Configure the following in your **Vercel Project Settings > Environment Variable
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Public / Client | Supabase Anon / Publishable Key                            |
 | `SUPABASE_URL`                  | Server          | Supabase Project URL                                       |
 | `SUPABASE_PUBLISHABLE_KEY`      | Server          | Supabase Anon Key                                          |
-| `LOVABLE_API_KEY`               | Server (Secret) | AI Gateway authentication token                            |
+| `GEMINI_API_KEY`                | Server (Secret) | Primary AI Provider (Google Gemini 2.5 Flash)              |
+| `GROQ_API_KEY`                  | Server (Secret) | Fallback AI Provider (Groq Llama 3.3 70B)                  |
+| `OPENROUTER_API_KEY`            | Server (Secret) | Secondary Fallback AI Provider (OpenRouter)                |
 
 ### 3. Build & Deployment Settings
 
@@ -208,7 +210,7 @@ cd getbid-radar
 npm install
 
 # 3. Configure environment variables
-cp .env.example .env # Ensure SUPABASE_URL and LOVABLE_API_KEY are configured
+cp .env.example .env # Ensure SUPABASE_URL and GEMINI_API_KEY are configured
 
 # 4. Start local development server
 npm run dev

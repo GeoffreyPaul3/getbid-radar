@@ -1,26 +1,46 @@
 /**
- * Centralized server-side AI gateway.
+ * Centralized server-side AI gateway for GetBidRadar.
  *
- * The ONLY place in the application that talks to an AI provider.
- * - credentials stay server-side (GEMINI_API_KEY)
- * - native structured JSON schema enforcement
- * - every response is validated with Zod before it leaves this module
- * - timeouts, bounded retries, provider error normalization, and secret masking
- * - provider-agnostic adapter architecture (Gemini 2.5 Flash + fallback)
+ * THE ONLY place in the application that talks to an AI provider.
  *
- * Nothing here accepts a client-provided system prompt.
+ * Provider cascade (attempted in order, failing-over on rate_limited / payment_required / timeout):
+ *   1. Google Gemini 2.5 Flash   — GEMINI_API_KEY (native structured JSON output)
+ *   2. Groq                      — GROQ_API_KEY   (llama-3.3-70b-versatile, tool_calls)
+ *   3. OpenRouter                — OPENROUTER_API_KEY (google/gemini-2.5-flash, JSON mode)
+ *
+ * Guarantees:
+ *   - All credentials stay server-side — never exposed to client bundles.
+ *   - Every response is Zod-validated before it leaves this module.
+ *   - Secret masking applied to all error strings.
+ *   - Deterministic scoring engine is the sole authority for BID/REVIEW/NO-BID.
+ *     Providers perform qualitative assessment only.
+ *   - No client-provided system prompt is ever accepted.
  */
 import { z } from "zod";
+
+// ──────────────────────────────────────────────────────────────
+// Provider constants
+// ──────────────────────────────────────────────────────────────
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-// Maintained for backward compatibility
+export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+export const GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+export const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash";
+export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+/** @deprecated Alias kept so existing imports don't break. Use GEMINI_BASE_URL. */
 export const DEFAULT_MODEL = DEFAULT_GEMINI_MODEL;
-export const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+// ──────────────────────────────────────────────────────────────
+// Public types
+// ──────────────────────────────────────────────────────────────
 
 export type AiUsage = {
   model: string;
+  activeProvider: "gemini" | "groq" | "openrouter";
   promptTokens?: number | undefined;
   completionTokens?: number | undefined;
   totalTokens?: number | undefined;
@@ -59,11 +79,20 @@ export type AiCallOptions<T> = {
   maxAttempts?: number;
 };
 
-function emptyUsage(model: string, started: number, attempts: number): AiUsage {
-  return { model, durationMs: Date.now() - started, attempts };
+// ──────────────────────────────────────────────────────────────
+// Utility helpers
+// ──────────────────────────────────────────────────────────────
+
+function emptyUsage(
+  model: string,
+  provider: AiUsage["activeProvider"],
+  started: number,
+  attempts: number,
+): AiUsage {
+  return { model, activeProvider: provider, durationMs: Date.now() - started, attempts };
 }
 
-/** Recursively mask sensitive tokens or keys from error strings. */
+/** Recursively mask sensitive tokens from error strings. */
 export function maskSecrets(raw: string, secrets: (string | undefined | null)[]): string {
   let cleaned = raw;
   for (const secret of secrets) {
@@ -101,7 +130,7 @@ export function recoverJson(raw: string): unknown | undefined {
 /**
  * Clean JSON schema for Google Gemini API.
  * Strips unsupported properties like `$schema` and `additionalProperties` which
- * can cause INVALID_ARGUMENT errors in Gemini v1beta.
+ * cause INVALID_ARGUMENT errors in Gemini v1beta.
  */
 export function cleanSchemaForGemini(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema;
@@ -117,50 +146,48 @@ export function cleanSchemaForGemini(schema: unknown): unknown {
   return cleaned;
 }
 
-/** Provider adapter interface for modular provider swapping. */
+// ──────────────────────────────────────────────────────────────
+// Provider adapter interface
+// ──────────────────────────────────────────────────────────────
+
+type ProviderAdapterResult =
+  | {
+      ok: true;
+      rawText: string;
+      promptTokens?: number | undefined;
+      completionTokens?: number | undefined;
+      totalTokens?: number | undefined;
+    }
+  | { ok: false; code: AiFailureCode; message: string; retryable: boolean };
+
 interface ProviderAdapter {
+  readonly name: AiUsage["activeProvider"];
   execute<T>(
     options: AiCallOptions<T>,
     apiKey: string,
     model: string,
     timeoutMs: number,
-  ): Promise<
-    | {
-        ok: true;
-        rawText: string;
-        promptTokens?: number | undefined;
-        completionTokens?: number | undefined;
-        totalTokens?: number | undefined;
-      }
-    | { ok: false; code: AiFailureCode; message: string; retryable: boolean }
-  >;
+  ): Promise<ProviderAdapterResult>;
 }
 
-/**
- * Direct Google Gemini API adapter.
- * Uses official generateContent endpoint with responseMimeType: "application/json"
- * and responseSchema for native structured output.
- */
+// ──────────────────────────────────────────────────────────────
+// 1. Google Gemini 2.5 Flash
+// ──────────────────────────────────────────────────────────────
+
 class GeminiProviderAdapter implements ProviderAdapter {
+  readonly name = "gemini" as const;
+
   async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
     const baseUrl = process.env["GEMINI_BASE_URL"] || GEMINI_BASE_URL;
     const url = `${baseUrl}/${encodeURIComponent(model)}:generateContent`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     const sanitizedSchema = cleanSchemaForGemini(options.jsonSchema);
 
     const requestBody = {
-      system_instruction: {
-        parts: [{ text: options.system }],
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: options.user }],
-        },
-      ],
+      system_instruction: { parts: [{ text: options.system }] },
+      contents: [{ role: "user", parts: [{ text: options.user }] }],
       generationConfig: {
         temperature: options.temperature ?? 0.1,
         responseMimeType: "application/json",
@@ -172,10 +199,7 @@ class GeminiProviderAdapter implements ProviderAdapter {
       const response = await fetch(url, {
         method: "POST",
         signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify(requestBody),
       });
 
@@ -183,8 +207,8 @@ class GeminiProviderAdapter implements ProviderAdapter {
         return {
           ok: false as const,
           code: "rate_limited" as const,
-          message: "Gemini API rate limit reached. Please retry shortly.",
-          retryable: true,
+          message: "Gemini API rate limit reached.",
+          retryable: false,
         };
       }
 
@@ -195,9 +219,7 @@ class GeminiProviderAdapter implements ProviderAdapter {
         } catch {
           /* ignore non-json error */
         }
-
-        const rawMsg =
-          errorBody?.error?.message ?? `Gemini provider returned status ${response.status}`;
+        const rawMsg = errorBody?.error?.message ?? `Gemini returned status ${response.status}`;
         const errorMsg = maskSecrets(rawMsg, [apiKey]);
 
         if (
@@ -211,39 +233,33 @@ class GeminiProviderAdapter implements ProviderAdapter {
             retryable: false,
           };
         }
-
         if (response.status === 403 || errorMsg.includes("PERMISSION_DENIED")) {
           return {
             ok: false as const,
             code: "provider_error" as const,
-            message: "Gemini API authentication failed or permission denied.",
+            message: "Gemini API permission denied.",
             retryable: false,
           };
         }
-
         if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota")) {
           return {
             ok: false as const,
             code: "payment_required" as const,
-            message: "Gemini API quota exceeded for this account.",
+            message: "Gemini API quota exceeded.",
             retryable: false,
           };
         }
-
-        const isTransient = response.status >= 500;
         return {
           ok: false as const,
           code: "provider_error" as const,
           message: errorMsg,
-          retryable: isTransient,
+          retryable: response.status >= 500,
         };
       }
 
       const body = (await response.json()) as {
         candidates?: Array<{
-          content?: {
-            parts?: Array<{ text?: string }>;
-          };
+          content?: { parts?: Array<{ text?: string }> };
           finishReason?: string;
         }>;
         usageMetadata?: {
@@ -276,7 +292,7 @@ class GeminiProviderAdapter implements ProviderAdapter {
           ok: false as const,
           code: "timeout" as const,
           message: `Gemini API request timed out after ${timeoutMs}ms.`,
-          retryable: true,
+          retryable: false,
         };
       }
       return {
@@ -291,22 +307,25 @@ class GeminiProviderAdapter implements ProviderAdapter {
   }
 }
 
-/**
- * Fallback adapter for OpenAI-compatible gateways (e.g., Lovable AI Gateway).
- * Maintained for backward compatibility with existing tests.
- */
-class OpenAiCompatibleAdapter implements ProviderAdapter {
+// ──────────────────────────────────────────────────────────────
+// 2. Groq (OpenAI-compatible, tool_calls structured output)
+// ──────────────────────────────────────────────────────────────
+
+class GroqProviderAdapter implements ProviderAdapter {
+  readonly name = "groq" as const;
+
   async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
+    const url = process.env["GROQ_BASE_URL"] || GROQ_BASE_URL;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(AI_GATEWAY_URL, {
+      const response = await fetch(url, {
         method: "POST",
         signal: controller.signal,
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model,
@@ -333,23 +352,32 @@ class OpenAiCompatibleAdapter implements ProviderAdapter {
         return {
           ok: false as const,
           code: "rate_limited" as const,
-          message: "AI provider rate limit reached. Please retry shortly.",
-          retryable: true,
+          message: "Groq rate limit reached.",
+          retryable: false,
         };
       }
       if (response.status === 402) {
         return {
           ok: false as const,
           code: "payment_required" as const,
-          message: "AI credits are exhausted for this workspace.",
+          message: "Groq credits exhausted.",
           retryable: false,
         };
       }
       if (!response.ok) {
+        let errorMsg = `Groq returned status ${response.status}`;
+        try {
+          const errBody = (await response.json()) as { error?: { message?: string } };
+          if (errBody?.error?.message) {
+            errorMsg = maskSecrets(errBody.error.message, [apiKey]);
+          }
+        } catch {
+          /* ignore */
+        }
         return {
           ok: false as const,
           code: "provider_error" as const,
-          message: `AI provider returned ${response.status}.`,
+          message: errorMsg,
           retryable: response.status >= 500,
         };
       }
@@ -379,8 +407,8 @@ class OpenAiCompatibleAdapter implements ProviderAdapter {
         return {
           ok: false as const,
           code: "timeout" as const,
-          message: `AI request timed out after ${timeoutMs}ms.`,
-          retryable: true,
+          message: `Groq request timed out after ${timeoutMs}ms.`,
+          retryable: false,
         };
       }
       return {
@@ -395,108 +423,278 @@ class OpenAiCompatibleAdapter implements ProviderAdapter {
   }
 }
 
+// ──────────────────────────────────────────────────────────────
+// 3. OpenRouter (OpenAI-compatible, JSON response_format)
+// ──────────────────────────────────────────────────────────────
+
+class OpenRouterProviderAdapter implements ProviderAdapter {
+  readonly name = "openrouter" as const;
+
+  async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
+    const url = process.env["OPENROUTER_BASE_URL"] || OPENROUTER_BASE_URL;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://getbidradar.com",
+          "X-Title": "GetBidRadar",
+        },
+        body: JSON.stringify({
+          model,
+          temperature: options.temperature ?? 0,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: `${options.system}\n\nYou MUST respond with valid JSON matching this schema:\n${JSON.stringify(options.jsonSchema, null, 2)}`,
+            },
+            { role: "user", content: options.user },
+          ],
+        }),
+      });
+
+      if (response.status === 429) {
+        return {
+          ok: false as const,
+          code: "rate_limited" as const,
+          message: "OpenRouter rate limit reached.",
+          retryable: false,
+        };
+      }
+      if (response.status === 402) {
+        return {
+          ok: false as const,
+          code: "payment_required" as const,
+          message: "OpenRouter credits exhausted.",
+          retryable: false,
+        };
+      }
+      if (!response.ok) {
+        let errorMsg = `OpenRouter returned status ${response.status}`;
+        try {
+          const errBody = (await response.json()) as { error?: { message?: string } };
+          if (errBody?.error?.message) {
+            errorMsg = maskSecrets(errBody.error.message, [apiKey]);
+          }
+        } catch {
+          /* ignore */
+        }
+        return {
+          ok: false as const,
+          code: "provider_error" as const,
+          message: errorMsg,
+          retryable: response.status >= 500,
+        };
+      }
+
+      const body = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string | null } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      const rawText = body.choices?.[0]?.message?.content ?? "";
+
+      return {
+        ok: true as const,
+        rawText,
+        promptTokens: body.usage?.prompt_tokens,
+        completionTokens: body.usage?.completion_tokens,
+        totalTokens: body.usage?.total_tokens,
+      };
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return {
+          ok: false as const,
+          code: "timeout" as const,
+          message: `OpenRouter request timed out after ${timeoutMs}ms.`,
+          retryable: false,
+        };
+      }
+      return {
+        ok: false as const,
+        code: "provider_error" as const,
+        message: maskSecrets((error as Error).message, [apiKey]),
+        retryable: true,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Provider cascade configuration
+// ──────────────────────────────────────────────────────────────
+
+type ProviderConfig = {
+  adapter: ProviderAdapter;
+  apiKey: string;
+  model: string;
+};
+
 /**
- * Main entry point for structured AI calls.
- * Selects the active provider adapter based on available environment credentials.
+ * Codes that signal provider exhaustion — trigger cascade to next provider.
+ * Codes like validation_failed / malformed_response are content problems and
+ * do NOT cascade to another provider (they retry within the same provider).
+ */
+const CASCADE_CODES = new Set<AiFailureCode>(["rate_limited", "payment_required", "timeout"]);
+
+/**
+ * Build the ordered list of available providers from environment.
+ * Provider is excluded if its key is absent or empty.
+ */
+function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
+  const providers: ProviderConfig[] = [];
+
+  const geminiKey = process.env["GEMINI_API_KEY"];
+  if (geminiKey) {
+    providers.push({
+      adapter: new GeminiProviderAdapter(),
+      apiKey: geminiKey,
+      model: modelOverride ?? process.env["GEMINI_MODEL"] ?? DEFAULT_GEMINI_MODEL,
+    });
+  }
+
+  const groqKey = process.env["GROQ_API_KEY"];
+  if (groqKey) {
+    providers.push({
+      adapter: new GroqProviderAdapter(),
+      apiKey: groqKey,
+      model: process.env["GROQ_MODEL"] ?? DEFAULT_GROQ_MODEL,
+    });
+  }
+
+  const openrouterKey = process.env["OPENROUTER_API_KEY"];
+  if (openrouterKey) {
+    providers.push({
+      adapter: new OpenRouterProviderAdapter(),
+      apiKey: openrouterKey,
+      model: process.env["OPENROUTER_MODEL"] ?? DEFAULT_OPENROUTER_MODEL,
+    });
+  }
+
+  return providers;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Main entry point
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Execute a structured AI call through the provider cascade.
+ *
+ * Tries Gemini → Groq → OpenRouter in order.
+ * Cascades to the next provider on rate_limited, payment_required, or timeout.
+ * Retries within the same provider on transient 5xx or network errors (bounded backoff).
+ * Never cascades on validation_failed or malformed_response — those are content issues.
  */
 export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<AiResult<T>> {
   const started = Date.now();
-  const geminiKey = process.env["GEMINI_API_KEY"];
-  const fallbackKey = process.env["LOVABLE_API_KEY"];
+  const cascade = buildProviderCascade(options.model);
 
-  if (!geminiKey && !fallbackKey) {
-    const model = options.model ?? DEFAULT_GEMINI_MODEL;
+  if (cascade.length === 0) {
     return {
       ok: false,
       code: "not_configured",
-      message: "AI is not configured for this environment. Please set GEMINI_API_KEY.",
-      usage: emptyUsage(model, started, 0),
+      message:
+        "AI is not configured for this environment. Please set GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
+      usage: emptyUsage(DEFAULT_GEMINI_MODEL, "gemini", started, 0),
     };
   }
-
-  // Choose provider: Gemini has primary precedence
-  const isGemini = Boolean(geminiKey);
-  const apiKey = (geminiKey || fallbackKey)!;
-  const model =
-    options.model ??
-    (isGemini ? process.env["GEMINI_MODEL"] || DEFAULT_GEMINI_MODEL : DEFAULT_MODEL);
-  const adapter: ProviderAdapter = isGemini
-    ? new GeminiProviderAdapter()
-    : new OpenAiCompatibleAdapter();
 
   const timeoutMs = options.timeoutMs ?? 90_000;
   const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
 
-  let attempts = 0;
   let lastCode: AiFailureCode = "provider_error";
   let lastMessage = "AI request failed.";
-  let promptTokens: number | undefined;
-  let completionTokens: number | undefined;
-  let totalTokens: number | undefined;
+  let lastProvider: AiUsage["activeProvider"] = cascade[0]!.adapter.name;
+  let lastModel = cascade[0]!.model;
+  let totalAttempts = 0;
 
-  while (attempts < maxAttempts) {
-    attempts += 1;
+  for (const { adapter, apiKey, model } of cascade) {
+    lastProvider = adapter.name;
+    lastModel = model;
 
-    const result = await adapter.execute(options, apiKey, model, timeoutMs);
+    let attempts = 0;
 
-    if (!result.ok) {
-      lastCode = result.code;
-      lastMessage = result.message;
+    while (attempts < maxAttempts) {
+      attempts += 1;
+      totalAttempts += 1;
 
-      if (!result.retryable || attempts >= maxAttempts) {
-        break;
+      const result = await adapter.execute(options, apiKey, model, timeoutMs);
+
+      if (!result.ok) {
+        lastCode = result.code;
+        lastMessage = result.message;
+
+        // Cascade codes: skip remaining attempts for this provider, try next
+        if (CASCADE_CODES.has(result.code)) {
+          break;
+        }
+
+        // Non-retryable provider errors: stop this provider immediately
+        if (!result.retryable || attempts >= maxAttempts) {
+          break;
+        }
+
+        // Bounded backoff for transient errors within a provider
+        await new Promise((r) => setTimeout(r, Math.min(2000, 500 * Math.pow(2, attempts - 1))));
+        continue;
       }
-      // Bounded backoff retry for transient network/rate issues
-      await new Promise((r) => setTimeout(r, Math.min(2000, 500 * Math.pow(2, attempts - 1))));
-      continue;
+
+      // Provider returned text — validate it
+      const payload = recoverJson(result.rawText);
+      if (payload === undefined) {
+        lastCode = "malformed_response";
+        lastMessage = "The AI response could not be parsed as structured data.";
+        // Retry within the same provider (content issue, not provider issue)
+        if (attempts >= maxAttempts) break;
+        continue;
+      }
+
+      const parsed = options.schema.safeParse(payload);
+      if (!parsed.success) {
+        lastCode = "validation_failed";
+        lastMessage = `The AI response did not match the expected schema: ${parsed.error.issues
+          .slice(0, 3)
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; ")}`;
+        // Retry within the same provider (content issue, not provider issue)
+        if (attempts >= maxAttempts) break;
+        continue;
+      }
+
+      return {
+        ok: true,
+        data: parsed.data,
+        usage: {
+          model,
+          activeProvider: adapter.name,
+          promptTokens: result.promptTokens,
+          completionTokens: result.completionTokens,
+          totalTokens: result.totalTokens,
+          durationMs: Date.now() - started,
+          attempts: totalAttempts,
+        },
+      };
     }
 
-    promptTokens = result.promptTokens;
-    completionTokens = result.completionTokens;
-    totalTokens = result.totalTokens;
-
-    const payload = recoverJson(result.rawText);
-    if (payload === undefined) {
-      lastCode = "malformed_response";
-      lastMessage = "The AI response could not be parsed as structured data.";
-      continue;
+    // Only cascade to the next provider if the failure was a capacity/quota/timeout code
+    if (!CASCADE_CODES.has(lastCode)) {
+      break;
     }
-
-    const parsed = options.schema.safeParse(payload);
-    if (!parsed.success) {
-      lastCode = "validation_failed";
-      lastMessage = `The AI response did not match the expected schema: ${parsed.error.issues
-        .slice(0, 3)
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ")}`;
-      continue;
-    }
-
-    return {
-      ok: true,
-      data: parsed.data,
-      usage: {
-        model,
-        promptTokens,
-        completionTokens,
-        totalTokens,
-        durationMs: Date.now() - started,
-        attempts,
-      },
-    };
   }
 
   return {
     ok: false,
     code: lastCode,
     message: lastMessage,
-    usage: {
-      model,
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      durationMs: Date.now() - started,
-      attempts,
-    },
+    usage: emptyUsage(lastModel, lastProvider, started, totalAttempts),
   };
 }

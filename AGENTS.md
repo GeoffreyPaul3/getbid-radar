@@ -1,12 +1,8 @@
-<!-- LOVABLE:BEGIN -->
+# GetBidRadar Development Guidelines
 
 > [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
 >
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-
-<!-- LOVABLE:END -->
+> - Avoid rewriting published git history — do not force push, rebase, amend, or squash commits that are already pushed.
+> - Keep the repository in a working state with passing tests, typechecks, and builds.
+> - Centralized AI Gateway: Google Gemini 2.5 Flash (Primary) → Groq (Fallback 1) → OpenRouter (Fallback 2).
+> - Deterministic scoring engine is the sole authority for BID / REVIEW / NO-BID decisions.

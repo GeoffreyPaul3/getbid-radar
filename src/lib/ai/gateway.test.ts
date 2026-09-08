@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
-  AI_GATEWAY_URL,
   callStructuredAi,
   cleanSchemaForGemini,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GROQ_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+  GEMINI_BASE_URL,
+  GROQ_BASE_URL,
+  OPENROUTER_BASE_URL,
   maskSecrets,
   recoverJson,
   type AiCallOptions,
@@ -102,6 +107,9 @@ describe("callStructuredAi", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    delete process.env["GEMINI_API_KEY"];
+    delete process.env["GROQ_API_KEY"];
+    delete process.env["OPENROUTER_API_KEY"];
     vi.restoreAllMocks();
   });
 
@@ -110,194 +118,13 @@ describe("callStructuredAi", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns not_configured when LOVABLE_API_KEY is missing", async () => {
-    delete process.env["LOVABLE_API_KEY"];
+  it("returns not_configured when all provider API keys are missing", async () => {
     const result = await callStructuredAi(baseOptions);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("not_configured");
       expect(result.message).toContain("not configured");
       expect(result.usage.attempts).toBe(0);
-    }
-  });
-
-  it("successfully returns structured data and usage metadata", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key-12345";
-
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            tool_calls: [
-              {
-                function: {
-                  arguments: JSON.stringify({ greeting: "hello", count: 100 }),
-                },
-              },
-            ],
-          },
-        },
-      ],
-      usage: {
-        prompt_tokens: 150,
-        completion_tokens: 50,
-        total_tokens: 200,
-      },
-    };
-
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockResponse,
-    });
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await callStructuredAi(baseOptions);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toEqual({ greeting: "hello", count: 100 });
-      expect(result.usage.promptTokens).toBe(150);
-      expect(result.usage.completionTokens).toBe(50);
-      expect(result.usage.totalTokens).toBe(200);
-      expect(result.usage.attempts).toBe(1);
-      expect(result.usage.durationMs).toBeGreaterThanOrEqual(0);
-    }
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      AI_GATEWAY_URL,
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer test-secret-key-12345",
-        }),
-      }),
-    );
-
-    // Verify secret is not exposed in the returned result
-    expect(JSON.stringify(result)).not.toContain("test-secret-key-12345");
-  });
-
-  it("recovers from content if tool_calls is not present", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key";
-
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: '```json\n{"greeting":"recovered","count":3}\n```',
-          },
-        },
-      ],
-    };
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => mockResponse,
-      }),
-    );
-
-    const result = await callStructuredAi(baseOptions);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toEqual({ greeting: "recovered", count: 3 });
-    }
-  });
-
-  it("handles validation failure and retries up to maxAttempts", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key";
-
-    // Invalid payload: count is a string, not number
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            tool_calls: [
-              {
-                function: {
-                  arguments: JSON.stringify({ greeting: "bad", count: "not-a-number" }),
-                },
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockResponse,
-    });
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("validation_failed");
-      expect(result.message).toContain("did not match the expected schema");
-      expect(result.usage.attempts).toBe(2);
-    }
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("fails immediately with payment_required on 402 without retrying", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key";
-
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 402,
-    });
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await callStructuredAi({ ...baseOptions, maxAttempts: 3 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("payment_required");
-      expect(result.usage.attempts).toBe(1);
-    }
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("handles provider HTTP 500 error with bounded retry", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key";
-
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-    });
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("provider_error");
-      expect(result.message).toContain("500");
-      expect(result.usage.attempts).toBe(2);
-    }
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("handles timeout gracefully", async () => {
-    process.env["LOVABLE_API_KEY"] = "test-secret-key";
-
-    const abortError = new Error("The operation was aborted");
-    abortError.name = "AbortError";
-
-    const fetchSpy = vi.fn().mockRejectedValue(abortError);
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1, timeoutMs: 50 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("timeout");
-      expect(result.message).toContain("timed out");
     }
   });
 
@@ -342,6 +169,7 @@ describe("callStructuredAi", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data).toEqual({ greeting: "Hello from Gemini 2.5 Flash", count: 42 });
+        expect(result.usage.activeProvider).toBe("gemini");
         expect(result.usage.model).toBe("gemini-2.5-flash");
         expect(result.usage.promptTokens).toBe(120);
         expect(result.usage.completionTokens).toBe(35);
@@ -350,9 +178,7 @@ describe("callStructuredAi", () => {
       }
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        ),
+        `${GEMINI_BASE_URL}/gemini-2.5-flash:generateContent`,
         expect.objectContaining({
           headers: expect.objectContaining({
             "x-goog-api-key": "ai-secret-gemini-key-999",
@@ -361,13 +187,11 @@ describe("callStructuredAi", () => {
         }),
       );
 
-      // Verify request body includes responseMimeType and sanitized responseSchema
       const callArgs = fetchSpy.mock.calls[0]!;
       const parsedBody = JSON.parse(callArgs[1].body as string);
       expect(parsedBody.generationConfig.responseMimeType).toBe("application/json");
       expect(parsedBody.generationConfig.responseSchema).toBeDefined();
 
-      // Masking verification
       expect(JSON.stringify(result)).not.toContain("ai-secret-gemini-key-999");
     });
 
@@ -398,7 +222,7 @@ describe("callStructuredAi", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("maps Gemini RESOURCE_EXHAUSTED / quota exceeded to payment_required", async () => {
+    it("maps Gemini RESOURCE_EXHAUSTED / quota exceeded to rate_limited", async () => {
       process.env["GEMINI_API_KEY"] = "gemini-key";
 
       const fetchSpy = vi.fn().mockResolvedValue({
@@ -422,6 +246,79 @@ describe("callStructuredAi", () => {
       }
     });
 
+    it("handles validation failure and retries up to maxAttempts within Gemini", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+
+      const mockResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({ greeting: "bad", count: "not-a-number" }),
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockResponse,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("validation_failed");
+        expect(result.message).toContain("did not match the expected schema");
+        expect(result.usage.attempts).toBe(2);
+      }
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("handles provider HTTP 500 error with bounded retry", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("provider_error");
+        expect(result.message).toContain("500");
+        expect(result.usage.attempts).toBe(2);
+      }
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("handles timeout gracefully", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+
+      const abortError = new Error("The operation was aborted");
+      abortError.name = "AbortError";
+
+      const fetchSpy = vi.fn().mockRejectedValue(abortError);
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1, timeoutMs: 50 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("timeout");
+        expect(result.message).toContain("timed out");
+      }
+    });
+
     it("masks secrets in Gemini error messages", async () => {
       process.env["GEMINI_API_KEY"] = "super-secret-token-abcdef";
 
@@ -436,6 +333,303 @@ describe("callStructuredAi", () => {
       if (!result.ok) {
         expect(result.message).not.toContain("super-secret-token-abcdef");
         expect(result.message).toContain("[REDACTED]");
+      }
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Groq Provider Tests                                                */
+  /* ------------------------------------------------------------------ */
+
+  describe("Groq Provider Adapter", () => {
+    it("successfully sends Groq payload with tool_calls and parses response", async () => {
+      process.env["GROQ_API_KEY"] = "gsk_test_groq_key_12345";
+
+      const mockGroqResponse = {
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  function: {
+                    arguments: JSON.stringify({ greeting: "Hello from Groq", count: 99 }),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        usage: {
+          prompt_tokens: 80,
+          completion_tokens: 25,
+          total_tokens: 105,
+        },
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockGroqResponse,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi(baseOptions);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ greeting: "Hello from Groq", count: 99 });
+        expect(result.usage.activeProvider).toBe("groq");
+        expect(result.usage.model).toBe(DEFAULT_GROQ_MODEL);
+        expect(result.usage.promptTokens).toBe(80);
+        expect(result.usage.completionTokens).toBe(25);
+        expect(result.usage.totalTokens).toBe(105);
+      }
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        GROQ_BASE_URL,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer gsk_test_groq_key_12345",
+            "Content-Type": "application/json",
+          }),
+        }),
+      );
+    });
+
+    it("handles Groq 429 rate limit correctly", async () => {
+      process.env["GROQ_API_KEY"] = "gsk_test_key";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("rate_limited");
+        expect(result.message).toContain("Groq rate limit");
+      }
+    });
+
+    it("handles Groq 402 payment required correctly", async () => {
+      process.env["GROQ_API_KEY"] = "gsk_test_key";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 402,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("payment_required");
+        expect(result.message).toContain("Groq credits exhausted");
+      }
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* OpenRouter Provider Tests                                          */
+  /* ------------------------------------------------------------------ */
+
+  describe("OpenRouter Provider Adapter", () => {
+    it("successfully sends OpenRouter payload with headers and parses content", async () => {
+      process.env["OPENROUTER_API_KEY"] = "sk-or-v1-test-key";
+
+      const mockResponse = {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ greeting: "Hello from OpenRouter", count: 77 }),
+            },
+          },
+        ],
+        usage: {
+          prompt_tokens: 60,
+          completion_tokens: 20,
+          total_tokens: 80,
+        },
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockResponse,
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi(baseOptions);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ greeting: "Hello from OpenRouter", count: 77 });
+        expect(result.usage.activeProvider).toBe("openrouter");
+        expect(result.usage.model).toBe(DEFAULT_OPENROUTER_MODEL);
+        expect(result.usage.promptTokens).toBe(60);
+      }
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        OPENROUTER_BASE_URL,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer sk-or-v1-test-key",
+            "HTTP-Referer": "https://getbidradar.com",
+            "X-Title": "GetBidRadar",
+          }),
+        }),
+      );
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Provider Cascade Tests                                             */
+  /* ------------------------------------------------------------------ */
+
+  describe("Provider Cascade Behavior", () => {
+    it("cascades from Gemini to Groq when Gemini is rate limited (429)", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+      process.env["GROQ_API_KEY"] = "groq-key";
+
+      const fetchSpy = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("generativelanguage.googleapis.com")) {
+          // Gemini returns 429
+          return Promise.resolve({
+            ok: false,
+            status: 429,
+            json: async () => ({
+              error: { code: 429, message: "Resource exhausted", status: "RESOURCE_EXHAUSTED" },
+            }),
+          });
+        }
+        if (url.includes("api.groq.com")) {
+          // Groq succeeds
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: JSON.stringify({ greeting: "Recovered via Groq", count: 55 }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 50, completion_tokens: 15, total_tokens: 65 },
+            }),
+          });
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi(baseOptions);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ greeting: "Recovered via Groq", count: 55 });
+        expect(result.usage.activeProvider).toBe("groq");
+      }
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("cascades from Gemini to OpenRouter when both Gemini and Groq fail with cascade codes", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+      process.env["GROQ_API_KEY"] = "groq-key";
+      process.env["OPENROUTER_API_KEY"] = "openrouter-key";
+
+      const fetchSpy = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("generativelanguage.googleapis.com")) {
+          // Gemini quota exhausted
+          return Promise.resolve({
+            ok: false,
+            status: 429,
+            json: async () => ({ error: { code: 429, message: "Quota exceeded" } }),
+          });
+        }
+        if (url.includes("api.groq.com")) {
+          // Groq payment required
+          return Promise.resolve({
+            ok: false,
+            status: 402,
+          });
+        }
+        if (url.includes("openrouter.ai")) {
+          // OpenRouter succeeds
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({ greeting: "Saved by OpenRouter", count: 12 }),
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 },
+            }),
+          });
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi(baseOptions);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toEqual({ greeting: "Saved by OpenRouter", count: 12 });
+        expect(result.usage.activeProvider).toBe("openrouter");
+      }
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("does NOT cascade to next provider on schema validation failure", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+      process.env["GROQ_API_KEY"] = "groq-key";
+
+      const fetchSpy = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("generativelanguage.googleapis.com")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: JSON.stringify({ invalidField: "bad" }) }],
+                  },
+                },
+              ],
+            }),
+          });
+        }
+        return Promise.reject(new Error(`Groq should not have been called!`));
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("validation_failed");
+        expect(result.usage.activeProvider).toBe("gemini");
+      }
+      // Both attempts should be against Gemini, never Groq
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      for (const call of fetchSpy.mock.calls) {
+        expect(call[0]).toContain("generativelanguage.googleapis.com");
       }
     });
   });
