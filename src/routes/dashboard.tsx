@@ -418,14 +418,19 @@ function DashboardPage() {
                           <Link
                             to="/tenders/$id"
                             params={{ id: opp.id }}
-                            className="font-display font-bold text-sm text-foreground hover:text-primary transition-colors truncate block"
+                            title={opp.title}
+                            className="font-display font-bold text-sm text-foreground hover:text-primary transition-colors line-clamp-2 break-words leading-snug block"
                           >
                             {opp.title}
                           </Link>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground font-mono">
                             {opp.buyer && (
-                              <span className="flex items-center gap-1 truncate">
-                                <Building2 className="h-3 w-3 text-muted-foreground" /> {opp.buyer}
+                              <span
+                                className="flex items-center gap-1 truncate max-w-[220px]"
+                                title={opp.buyer}
+                              >
+                                <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span className="truncate">{opp.buyer}</span>
                               </span>
                             )}
                             {opp.deadline && (
@@ -489,7 +494,8 @@ function DashboardPage() {
                         <Link
                           to="/tenders/$id"
                           params={{ id: opp.id }}
-                          className="font-semibold text-xs text-foreground hover:text-primary transition-colors truncate block"
+                          title={opp.title}
+                          className="font-semibold text-xs text-foreground hover:text-primary transition-colors line-clamp-2 break-words leading-snug block"
                         >
                           {opp.title}
                         </Link>

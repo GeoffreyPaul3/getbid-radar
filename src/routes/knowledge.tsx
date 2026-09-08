@@ -342,7 +342,10 @@ function KnowledgeBasePage() {
                     </Badge>
                   </div>
 
-                  <h3 className="font-display font-semibold text-sm text-foreground leading-snug line-clamp-2">
+                  <h3
+                    className="font-display font-semibold text-sm text-foreground leading-snug line-clamp-2 break-words"
+                    title={doc.title}
+                  >
                     {doc.title}
                   </h3>
 

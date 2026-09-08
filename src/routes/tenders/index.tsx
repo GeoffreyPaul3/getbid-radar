@@ -325,15 +325,15 @@ function TendersListPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-surface shadow-subtle overflow-hidden">
-            <Table>
+            <Table className="min-w-[700px] w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[38%]">Tender Title & Buyer</TableHead>
-                  <TableHead className="w-[14%]">Recommendation</TableHead>
-                  <TableHead className="w-[12%]">Score</TableHead>
-                  <TableHead className="w-[12%]">Deadline</TableHead>
-                  <TableHead className="w-[12%]">Pursuit</TableHead>
-                  <TableHead className="w-[12%] text-right">Action</TableHead>
+                  <TableHead className="w-[40%] min-w-[240px]">Tender Title & Buyer</TableHead>
+                  <TableHead className="w-[14%] min-w-[120px]">Recommendation</TableHead>
+                  <TableHead className="w-[11%] min-w-[90px]">Score</TableHead>
+                  <TableHead className="w-[12%] min-w-[100px]">Deadline</TableHead>
+                  <TableHead className="w-[11%] min-w-[100px]">Pursuit</TableHead>
+                  <TableHead className="w-[12%] min-w-[90px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -345,22 +345,27 @@ function TendersListPage() {
 
                   return (
                     <TableRow key={item.id} className="hover:bg-surface-muted/40 transition-colors">
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 max-w-[260px] sm:max-w-sm md:max-w-md lg:max-w-lg">
                         <Link
                           to="/tenders/$id"
                           params={{ id: item.id }}
-                          className="font-display font-bold text-sm text-foreground hover:text-primary transition-colors block truncate"
+                          title={item.title}
+                          className="font-display font-bold text-sm text-foreground hover:text-primary transition-colors line-clamp-2 break-words leading-snug"
                         >
                           {item.title}
                         </Link>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 min-w-0">
                           {item.buyer && (
-                            <span className="flex items-center gap-1 truncate">
-                              <Building2 className="h-3 w-3 text-muted-foreground" /> {item.buyer}
+                            <span
+                              className="flex items-center gap-1 truncate max-w-[200px]"
+                              title={item.buyer}
+                            >
+                              <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="truncate">{item.buyer}</span>
                             </span>
                           )}
                           {item.source_type && (
-                            <span className="font-mono text-[10px] uppercase bg-surface-muted text-muted-foreground px-1.5 py-0.2 rounded border border-border/50">
+                            <span className="font-mono text-[10px] uppercase bg-surface-muted text-muted-foreground px-1.5 py-0.2 rounded border border-border/50 shrink-0">
                               {item.source_type}
                             </span>
                           )}

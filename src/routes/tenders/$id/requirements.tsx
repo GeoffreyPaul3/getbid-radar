@@ -281,20 +281,21 @@ function RequirementsMatrixPage() {
       <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
         {/* Navigation Breadcrumb */}
         <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            <Link to="/tenders" className="hover:text-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1 min-w-0">
+            <Link to="/tenders" className="hover:text-foreground shrink-0">
               Tenders
             </Link>
             <span>/</span>
             <Link
               to="/tenders/$id"
               params={{ id: id || "" }}
-              className="hover:text-foreground truncate max-w-xs"
+              className="hover:text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-md"
+              title={opportunity?.title}
             >
               {opportunity?.title || "Tender"}
             </Link>
             <span>/</span>
-            <span className="text-foreground">Requirements Matrix</span>
+            <span className="text-foreground shrink-0">Requirements Matrix</span>
           </div>
           <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <span>Requirements Compliance Matrix</span>

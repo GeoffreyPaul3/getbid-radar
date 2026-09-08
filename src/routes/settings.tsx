@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, Shield, Sparkles, Loader2, Save } from "lucide-react";
+import { Building2, Users, Shield, Sparkles, Loader2, Save, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -152,7 +152,7 @@ function SettingsPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-mono">
-              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              <Gauge className="h-3.5 w-3.5 text-accent" />
               <span>Readiness:</span>
               <span className="font-bold text-foreground">{completenessScore}%</span>
             </div>

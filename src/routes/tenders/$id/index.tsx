@@ -240,21 +240,26 @@ function IntelligenceReportPage() {
         {/* Navigation Breadcrumb */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1">
-              <Link to="/tenders" className="hover:text-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1 min-w-0">
+              <Link to="/tenders" className="hover:text-foreground shrink-0">
                 Tenders
               </Link>
               <span>/</span>
-              <span className="text-foreground truncate max-w-xs">{opportunity.title}</span>
+              <span
+                className="text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-md"
+                title={opportunity.title}
+              >
+                {opportunity.title}
+              </span>
             </div>
-            <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
-              <span className="truncate">{opportunity.title}</span>
+            <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight text-foreground flex items-start sm:items-center gap-3 break-words min-w-0">
+              <span className="break-words leading-tight">{opportunity.title}</span>
               {opportunity.source_url && (
                 <a
                   href={opportunity.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-accent"
+                  className="text-muted-foreground hover:text-primary shrink-0 mt-1 sm:mt-0"
                   title="Open Source URL"
                 >
                   <ExternalLink className="h-4 w-4" />
