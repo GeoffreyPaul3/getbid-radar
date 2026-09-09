@@ -103,6 +103,8 @@ function NewTenderPage() {
           workspaceId: workspace.id,
           storagePath,
           fileName: selectedFile.name,
+          fileSize: selectedFile.size,
+          mimeType: selectedFile.type || "application/octet-stream",
           title: customTitle.trim() || undefined,
           buyer: buyer.trim() || undefined,
         },

@@ -13,8 +13,9 @@ const uploadIntakeSchema = z.object({
   workspaceId: z.string().uuid(),
   storagePath: z.string().min(1),
   fileName: z.string().min(1),
-  fileSize: z.number().int().positive(),
-  mimeType: z.string(),
+  // coerce handles the case where seroval/transport round-trips the number as a string
+  fileSize: z.coerce.number().int().positive(),
+  mimeType: z.string().min(1).default("application/octet-stream"),
   title: z.string().optional(),
   buyer: z.string().optional(),
 });

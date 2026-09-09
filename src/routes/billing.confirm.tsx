@@ -43,41 +43,77 @@ export const Route = createFileRoute("/billing/confirm")({
 
 function BillingConfirmPage() {
   const { tx_ref: txRef } = Route.useSearch();
-  const { workspace, refetchWorkspace } = useWorkspace();
+  const { workspace, allWorkspaces, isLoading: workspaceLoading, refetchWorkspace } = useWorkspace();
   const navigate = useNavigate();
 
   const [verifying, setVerifying] = useState(true);
   const [result, setResult] = useState<VerifyPaymentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const performVerification = useCallback(async () => {
-    if (!workspace || !txRef) {
-      setVerifying(false);
-      return;
-    }
+  // Track the txRef to prevent infinite re-verification loops
+  const verifiedTxRef = React.useRef<string | null>(null);
+  const isExecutingRef = React.useRef(false);
 
-    setVerifying(true);
-    setError(null);
-
-    try {
-      const res = await verifyPaymentFn({
-        data: {
-          workspaceId: workspace.id,
-          txRef,
-        },
-      });
-
-      setResult(res as VerifyPaymentResult);
-      if (res.status === "successful") {
-        await refetchWorkspace();
+  const performVerification = useCallback(
+    async (force = false) => {
+      if (!txRef) {
+        setVerifying(false);
+        return;
       }
-    } catch (err: unknown) {
-      console.error("[BillingConfirm] Verification error:", err);
-      setError(err instanceof Error ? err.message : "Failed to verify transaction.");
-    } finally {
-      setVerifying(false);
-    }
-  }, [workspace, txRef, refetchWorkspace]);
+
+      // Wait until workspace context finishes loading
+      if (workspaceLoading) {
+        return;
+      }
+
+      if (!workspace) {
+        setError("Active workspace could not be loaded. Please log in again.");
+        setVerifying(false);
+        return;
+      }
+
+      // Skip duplicate automatic verification for the same reference
+      if (!force && verifiedTxRef.current === txRef) {
+        return;
+      }
+
+      if (isExecutingRef.current) {
+        return;
+      }
+
+      isExecutingRef.current = true;
+      verifiedTxRef.current = txRef;
+      setVerifying(true);
+      setError(null);
+
+      // Find the workspace matching txRef prefix if multiple exist
+      const targetWs =
+        allWorkspaces.find((w) => txRef.includes(w.id.substring(0, 8))) || workspace;
+
+      try {
+        const res = await verifyPaymentFn({
+          data: {
+            workspaceId: targetWs.id,
+            txRef,
+          },
+        });
+
+        const verifyRes = res as VerifyPaymentResult;
+        setResult(verifyRes);
+
+        if (verifyRes.status === "successful") {
+          await refetchWorkspace();
+        }
+      } catch (err: unknown) {
+        console.error("[BillingConfirm] Verification error:", err);
+        setError(err instanceof Error ? err.message : "Failed to verify transaction.");
+      } finally {
+        isExecutingRef.current = false;
+        setVerifying(false);
+      }
+    },
+    [txRef, workspace, allWorkspaces, workspaceLoading, refetchWorkspace],
+  );
 
   useEffect(() => {
     performVerification();
@@ -125,7 +161,7 @@ function BillingConfirmPage() {
                 {txRef && (
                   <Button
                     size="sm"
-                    onClick={performVerification}
+                    onClick={() => performVerification(true)}
                     className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold"
                   >
                     <RefreshCw className="h-3.5 w-3.5" /> Retry Verification
@@ -173,7 +209,7 @@ function BillingConfirmPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground font-sans">Amount Paid:</span>
                     <span className="font-bold text-foreground">
-                      {formatBillingAmount(result.amount, result.currency as BillingCurrency)}
+                      {formatBillingAmount(Number(result.amount), (result.currency as BillingCurrency) || "MWK")}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -235,7 +271,7 @@ function BillingConfirmPage() {
               <CardFooter className="flex justify-center gap-3 pt-2">
                 <Button
                   size="sm"
-                  onClick={performVerification}
+                  onClick={() => performVerification(true)}
                   className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold"
                 >
                   <RefreshCw className="h-3.5 w-3.5" /> Check Status Again

@@ -188,17 +188,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, fetchWorkspaceData]);
 
-  const switchWorkspace = async (workspaceId: string) => {
-    await fetchWorkspaceData(workspaceId);
-  };
+  const activeWorkspaceIdRef = React.useRef<string | undefined>(workspace?.id);
+  useEffect(() => {
+    activeWorkspaceIdRef.current = workspace?.id;
+  }, [workspace?.id]);
 
-  const refetchWorkspace = async () => {
-    if (workspace?.id) {
-      await fetchWorkspaceData(workspace.id);
-    } else {
-      await fetchWorkspaceData();
-    }
-  };
+  const switchWorkspace = useCallback(
+    async (workspaceId: string) => {
+      await fetchWorkspaceData(workspaceId);
+    },
+    [fetchWorkspaceData],
+  );
+
+  const refetchWorkspace = useCallback(async () => {
+    await fetchWorkspaceData(activeWorkspaceIdRef.current);
+  }, [fetchWorkspaceData]);
 
   const isOnboarded = Boolean(workspace?.onboarding_completed_at);
   const completenessScore = calculateProfileCompleteness(companyProfile);
