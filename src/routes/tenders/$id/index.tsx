@@ -106,7 +106,7 @@ function IntelligenceReportPage() {
   const handleTriggerAnalysis = async (force = false) => {
     if (!id) return;
     setIsReanalyzing(true);
-    const toastId = toast.loading("Executing Phase 2 qualification engine...");
+    const toastId = toast.loading("Running qualification analysis...");
     try {
       await analyzeOpportunity({
         data: {
@@ -382,13 +382,12 @@ function IntelligenceReportPage() {
                     </span>
                   </div>
                   <h3 className="font-display font-bold text-lg text-foreground">
-                    Tender Qualification Engine Stopped
+                    Analysis Could Not Complete
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-                    The qualification engine could not complete because requirement extraction or AI
-                    analysis failed. No BID, REVIEW, or NO-BID recommendation was produced.
-                    Qualification scores, confidence metrics, and strategic conclusions remain
-                    uncomputed to prevent misleading evaluation.
+                    The analysis could not be completed because requirement extraction or AI
+                    processing encountered an error. No BID, REVIEW, or NO-BID recommendation was
+                    produced. Please retry or contact support if the issue persists.
                   </p>
                 </div>
               </div>
@@ -434,8 +433,8 @@ function IntelligenceReportPage() {
                 Ready for Intelligence Analysis
               </h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                Tender text has been indexed. Run the Phase 2 analysis engine to evaluate
-                qualification scores and requirement alignment.
+                Tender documents have been processed. Run the analysis to evaluate your
+                qualification and requirement alignment.
               </p>
             </div>
             <Button
@@ -524,7 +523,7 @@ function IntelligenceReportPage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-                <span>Deterministic Scoring Engine • Version {analysis?.version}</span>
+                <span>Qualification Score • Version {analysis?.version}</span>
                 <span>
                   Idempotent Fingerprint: {analysis?.inputs_fingerprint?.slice(0, 8) || "active"}
                 </span>
@@ -725,12 +724,9 @@ function IntelligenceReportPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="font-display text-lg">
-                      Deterministic Score Components
-                    </CardTitle>
+                    <CardTitle className="font-display text-lg">Score Breakdown</CardTitle>
                     <CardDescription className="text-xs">
-                      Authoritative evaluation across 8 dimensions derived by the Phase 2 scoring
-                      engine.
+                      Qualification scores across 8 evaluation dimensions.
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="font-mono text-xs">

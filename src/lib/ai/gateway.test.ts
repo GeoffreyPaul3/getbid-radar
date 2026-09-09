@@ -38,6 +38,14 @@ const baseOptions: AiCallOptions<TestType> = {
   timeoutMs: 5000,
 };
 
+function mockResponse(data: unknown, status = 200) {
+  const body = typeof data === "string" ? data : JSON.stringify(data);
+  return new Response(body, {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("recoverJson", () => {
   it("parses clean JSON", () => {
     expect(recoverJson('{"greeting":"hello","count":42}')).toEqual({
@@ -87,7 +95,7 @@ describe("cleanSchemaForGemini", () => {
     const itemsProp = cleanedProperties["items"]!;
     const itemsItems = itemsProp["items"] as Record<string, any>;
     expect(itemsItems["additionalProperties"]).toBeUndefined();
-    expect((itemsItems["properties"] as Record<string, any>)["name"]?.["type"]).toBe("string");
+    expect((itemsItems["properties"] as Record<string, any>)["name"]?.["type"]).toBe("STRING");
   });
 });
 
@@ -135,7 +143,7 @@ describe("callStructuredAi", () => {
   describe("Google Gemini 2.5 Flash Provider Adapter", () => {
     it("successfully sends Gemini payload with x-goog-api-key header and parses structured output", async () => {
       process.env["GEMINI_API_KEY"] = "ai-secret-gemini-key-999";
-      process.env["GEMINI_MODEL"] = "gemini-2.5-flash";
+      process.env["GEMINI_MODEL"] = "gemini-3.6-flash";
 
       const mockGeminiResponse = {
         candidates: [
@@ -157,11 +165,7 @@ describe("callStructuredAi", () => {
         },
       };
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => mockGeminiResponse,
-      });
+      const fetchSpy = vi.fn().mockResolvedValue(mockResponse(mockGeminiResponse));
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi(baseOptions);
@@ -170,7 +174,7 @@ describe("callStructuredAi", () => {
       if (result.ok) {
         expect(result.data).toEqual({ greeting: "Hello from Gemini 2.5 Flash", count: 42 });
         expect(result.usage.activeProvider).toBe("gemini");
-        expect(result.usage.model).toBe("gemini-2.5-flash");
+        expect(result.usage.model).toBe("gemini-3.6-flash");
         expect(result.usage.promptTokens).toBe(120);
         expect(result.usage.completionTokens).toBe(35);
         expect(result.usage.totalTokens).toBe(155);
@@ -178,16 +182,18 @@ describe("callStructuredAi", () => {
       }
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        `${GEMINI_BASE_URL}/gemini-2.5-flash:generateContent`,
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            "x-goog-api-key": "ai-secret-gemini-key-999",
-            "Content-Type": "application/json",
-          }),
-        }),
+        expect.stringContaining("/gemini-3.6-flash:generateContent"),
+        expect.anything(),
       );
 
       const callArgs = fetchSpy.mock.calls[0]!;
+      const headers = callArgs[1].headers;
+      const keyHeader =
+        typeof headers?.get === "function"
+          ? headers.get("x-goog-api-key")
+          : headers?.["x-goog-api-key"];
+      expect(keyHeader).toBe("ai-secret-gemini-key-999");
+
       const parsedBody = JSON.parse(callArgs[1].body as string);
       expect(parsedBody.generationConfig.responseMimeType).toBe("application/json");
       expect(parsedBody.generationConfig.responseSchema).toBeDefined();
@@ -198,17 +204,18 @@ describe("callStructuredAi", () => {
     it("handles Gemini invalid API key error without retrying", async () => {
       process.env["GEMINI_API_KEY"] = "invalid-key-xyz";
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: async () => ({
-          error: {
-            code: 400,
-            message: "API key not valid. Please pass a valid API key.",
-            status: "INVALID_ARGUMENT",
+      const fetchSpy = vi.fn().mockResolvedValue(
+        mockResponse(
+          {
+            error: {
+              code: 400,
+              message: "API key not valid. Please pass a valid API key.",
+              status: "INVALID_ARGUMENT",
+            },
           },
-        }),
-      });
+          400,
+        ),
+      );
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi({ ...baseOptions, maxAttempts: 3 });
@@ -224,12 +231,13 @@ describe("callStructuredAi", () => {
 
     it("handles Gemini HTTP 503 error as provider_unavailable", async () => {
       process.env["GEMINI_API_KEY"] = "gemini-key";
+      process.env["GEMINI_MODELS"] = "gemini-3.6-flash";
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-        json: async () => ({ error: { message: "Service Unavailable" } }),
-      });
+      const fetchSpy = vi
+        .fn()
+        .mockResolvedValue(
+          mockResponse({ error: { message: "Service Unavailable", status: "UNAVAILABLE" } }, 503),
+        );
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
@@ -243,17 +251,18 @@ describe("callStructuredAi", () => {
     it("maps Gemini RESOURCE_EXHAUSTED / quota exceeded to rate_limited", async () => {
       process.env["GEMINI_API_KEY"] = "gemini-key";
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 429,
-        json: async () => ({
-          error: {
-            code: 429,
-            message: "Resource has been exhausted (e.g. check quota).",
-            status: "RESOURCE_EXHAUSTED",
+      const fetchSpy = vi.fn().mockResolvedValue(
+        mockResponse(
+          {
+            error: {
+              code: 429,
+              message: "Resource has been exhausted (e.g. check quota).",
+              status: "RESOURCE_EXHAUSTED",
+            },
           },
-        }),
-      });
+          429,
+        ),
+      );
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
@@ -267,7 +276,7 @@ describe("callStructuredAi", () => {
     it("handles validation failure and retries up to maxAttempts within Gemini", async () => {
       process.env["GEMINI_API_KEY"] = "gemini-key";
 
-      const mockResponse = {
+      const mockResponseData = {
         candidates: [
           {
             content: {
@@ -281,11 +290,7 @@ describe("callStructuredAi", () => {
         ],
       };
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => mockResponse,
-      });
+      const fetchSpy = vi.fn().mockImplementation(() => mockResponse(mockResponseData));
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
@@ -302,10 +307,11 @@ describe("callStructuredAi", () => {
     it("handles provider HTTP 500 error with bounded retry", async () => {
       process.env["GEMINI_API_KEY"] = "gemini-key";
 
-      const fetchSpy = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-      });
+      const fetchSpy = vi
+        .fn()
+        .mockImplementation(() =>
+          mockResponse({ error: { code: 500, message: "500 Internal Server Error" } }, 500),
+        );
       vi.stubGlobal("fetch", fetchSpy);
 
       const result = await callStructuredAi({ ...baseOptions, maxAttempts: 2 });
@@ -516,20 +522,17 @@ describe("callStructuredAi", () => {
       const fetchSpy = vi.fn().mockImplementation((url: string) => {
         if (url.includes("generativelanguage.googleapis.com")) {
           // Gemini returns 429
-          return Promise.resolve({
-            ok: false,
-            status: 429,
-            json: async () => ({
-              error: { code: 429, message: "Resource exhausted", status: "RESOURCE_EXHAUSTED" },
-            }),
-          });
+          return Promise.resolve(
+            mockResponse(
+              { error: { code: 429, message: "Resource exhausted", status: "RESOURCE_EXHAUSTED" } },
+              429,
+            ),
+          );
         }
         if (url.includes("api.groq.com")) {
           // Groq succeeds
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
+          return Promise.resolve(
+            mockResponse({
               choices: [
                 {
                   message: {
@@ -545,7 +548,7 @@ describe("callStructuredAi", () => {
               ],
               usage: { prompt_tokens: 50, completion_tokens: 15, total_tokens: 65 },
             }),
-          });
+          );
         }
         return Promise.reject(new Error(`Unexpected URL: ${url}`));
       });
@@ -569,25 +572,21 @@ describe("callStructuredAi", () => {
       const fetchSpy = vi.fn().mockImplementation((url: string) => {
         if (url.includes("generativelanguage.googleapis.com")) {
           // Gemini quota exhausted
-          return Promise.resolve({
-            ok: false,
-            status: 429,
-            json: async () => ({ error: { code: 429, message: "Quota exceeded" } }),
-          });
+          return Promise.resolve(
+            mockResponse(
+              { error: { code: 429, message: "Quota exceeded", status: "RESOURCE_EXHAUSTED" } },
+              429,
+            ),
+          );
         }
         if (url.includes("api.groq.com")) {
           // Groq payment required
-          return Promise.resolve({
-            ok: false,
-            status: 402,
-          });
+          return Promise.resolve(mockResponse({ error: { message: "Payment required" } }, 402));
         }
         if (url.includes("openrouter.ai")) {
           // OpenRouter succeeds
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
+          return Promise.resolve(
+            mockResponse({
               choices: [
                 {
                   message: {
@@ -597,7 +596,7 @@ describe("callStructuredAi", () => {
               ],
               usage: { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 },
             }),
-          });
+          );
         }
         return Promise.reject(new Error(`Unexpected URL: ${url}`));
       });
@@ -619,10 +618,8 @@ describe("callStructuredAi", () => {
 
       const fetchSpy = vi.fn().mockImplementation((url: string) => {
         if (url.includes("generativelanguage.googleapis.com")) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
+          return Promise.resolve(
+            mockResponse({
               candidates: [
                 {
                   content: {
@@ -631,7 +628,7 @@ describe("callStructuredAi", () => {
                 },
               ],
             }),
-          });
+          );
         }
         return Promise.reject(new Error(`Groq should not have been called!`));
       });

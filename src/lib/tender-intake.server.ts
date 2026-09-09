@@ -120,10 +120,121 @@ export async function validateSafeUrl(
  * Safely fetches remote tender content with SSRF guards, redirect checking,
  * timeouts, and byte limits.
  */
+const BROWSER_HEADERS_PRIMARY: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+const BROWSER_HEADERS_FALLBACK: Record<string, string> = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.5",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+export const USER_FACING_URL_ERROR =
+  "GetBidRadar couldn't retrieve this public page. Try uploading the tender document instead.";
+
+/**
+ * Extracts rich metadata (title, buyer, description, deadline) from HTML.
+ */
+export function extractHtmlMetadata(rawHtml: string): {
+  title?: string | undefined;
+  description?: string | undefined;
+  buyer?: string | undefined;
+  deadline?: string | undefined;
+} {
+  const getMeta = (prop: string) => {
+    const m =
+      new RegExp(
+        `<meta\\s+[^>]*(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`,
+        "i",
+      ).exec(rawHtml) ||
+      new RegExp(
+        `<meta\\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`,
+        "i",
+      ).exec(rawHtml);
+    return m ? m[1]?.trim() : undefined;
+  };
+
+  const rawTitle =
+    getMeta("og:title") ||
+    getMeta("twitter:title") ||
+    /<h1[^>]*>([^<]+)<\/h1>/i.exec(rawHtml)?.[1]?.trim() ||
+    /<title[^>]*>([^<]+)<\/title>/i.exec(rawHtml)?.[1]?.trim();
+
+  let cleanTitle = rawTitle;
+  if (cleanTitle) {
+    cleanTitle = cleanTitle
+      .replace(/&amp;/g, "&")
+      .replace(/&#x27;/g, "'")
+      .replace(/&#39;/g, "'")
+      .replace(/\s+[—–-]\s+[A-Za-z0-9\s&]+$/, "")
+      .replace(/\s+\|\s+[A-Za-z0-9\s&]+$/, "")
+      .trim();
+  }
+
+  const rawDesc = getMeta("og:description") || getMeta("description");
+  const cleanDesc = rawDesc
+    ? rawDesc
+        .replace(/&amp;/g, "&")
+        .replace(/&#x27;/g, "'")
+        .replace(/&#39;/g, "'")
+        .trim()
+    : undefined;
+
+  const siteName = getMeta("og:site_name") || getMeta("author");
+
+  let deadline: string | undefined;
+  const deadlineMatch =
+    /(?:deadline|closing date|submission deadline)[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-z]+\s+\d{4})/i.exec(
+      rawHtml,
+    );
+  if (deadlineMatch?.[1]) {
+    const parsed = new Date(deadlineMatch[1]);
+    if (!Number.isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, "0");
+      const d = String(parsed.getDate()).padStart(2, "0");
+      deadline = `${y}-${m}-${d}`;
+    }
+  }
+
+  return {
+    title: cleanTitle || undefined,
+    description: cleanDesc || undefined,
+    buyer: siteName || undefined,
+    deadline,
+  };
+}
+
+export type SafeTenderFetchResult = {
+  ok: boolean;
+  text?: string | undefined;
+  title?: string | undefined;
+  buyer?: string | undefined;
+  description?: string | undefined;
+  deadline?: string | undefined;
+  contentType?: string | undefined;
+  error?: string | undefined;
+};
+
+/**
+ * Safely fetches remote tender content with SSRF guards, redirect checking,
+ * timeouts, modern browser headers, safe fallback, and byte limits.
+ */
 export async function fetchSafeTenderUrl(
   targetUrl: string,
   maxRedirects = 3,
-): Promise<{ ok: boolean; text?: string; title?: string; contentType?: string; error?: string }> {
+): Promise<SafeTenderFetchResult> {
   let currentUrl = targetUrl;
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount++) {
@@ -136,16 +247,33 @@ export async function fetchSafeTenderUrl(
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
-      const response = await fetch(currentUrl, {
+      let response = await fetch(currentUrl, {
         method: "GET",
         signal: controller.signal,
         redirect: "manual", // Handle redirects manually to inspect destination IPs
-        headers: {
-          "User-Agent":
-            "GetBidRadar/2.0 (Enterprise Tender Verification Engine; +https://getbid-radar.vercel.app)",
-          Accept: "text/html,application/xhtml+xml,application/pdf,application/xml,text/plain,*/*",
-        },
+        headers: BROWSER_HEADERS_PRIMARY,
       });
+
+      // Safe fallback on 403/429/503
+      if (
+        (response.status === 403 || response.status === 429 || response.status === 503) &&
+        redirectCount === 0
+      ) {
+        try {
+          const fallbackRes = await fetch(currentUrl, {
+            method: "GET",
+            signal: controller.signal,
+            redirect: "manual",
+            headers: BROWSER_HEADERS_FALLBACK,
+          });
+          if (fallbackRes.ok || (fallbackRes.status >= 300 && fallbackRes.status < 400)) {
+            response = fallbackRes;
+          }
+        } catch {
+          // Keep primary response
+        }
+      }
+
       clearTimeout(timer);
 
       // Handle Redirects
@@ -159,9 +287,12 @@ export async function fetchSafeTenderUrl(
       }
 
       if (!response.ok) {
+        console.warn(
+          `[Intake] Server responded with HTTP ${response.status}: ${response.statusText} for ${currentUrl}`,
+        );
         return {
           ok: false,
-          error: `Remote server responded with HTTP ${response.status}: ${response.statusText}`,
+          error: USER_FACING_URL_ERROR,
         };
       }
 
@@ -198,9 +329,7 @@ export async function fetchSafeTenderUrl(
 
       // Default to HTML / text
       const rawText = new TextDecoder("utf-8").decode(bytes);
-      // Extract page <title> if present
-      const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(rawText);
-      const pageTitle = titleMatch ? titleMatch[1]?.trim() : undefined;
+      const metadata = extractHtmlMetadata(rawText);
 
       const cleanText = htmlToText(rawText);
       if (!cleanText || cleanText.length < 50) {
@@ -213,7 +342,10 @@ export async function fetchSafeTenderUrl(
       return {
         ok: true,
         text: cleanText,
-        title: pageTitle || "Tender Notice",
+        title: metadata.title || "Tender Notice",
+        buyer: metadata.buyer,
+        description: metadata.description,
+        deadline: metadata.deadline,
         contentType,
       };
     } catch (err) {
@@ -221,10 +353,10 @@ export async function fetchSafeTenderUrl(
       if ((err as Error).name === "AbortError") {
         return {
           ok: false,
-          error: "Connection timed out while retrieving tender document (12s limit).",
+          error: USER_FACING_URL_ERROR,
         };
       }
-      return { ok: false, error: `Failed to retrieve tender document: ${(err as Error).message}` };
+      return { ok: false, error: USER_FACING_URL_ERROR };
     }
   }
 
@@ -257,8 +389,10 @@ export async function ingestTenderFromUrl(args: {
     throw new Error(fetchResult.error ?? "Failed to ingest tender from URL.");
   }
 
-  const title = customTitle?.trim() || fetchResult.title || "Tender Ingested from URL";
   const extractedText = fetchResult.text;
+  const title = customTitle?.trim() || fetchResult.title || "Tender Ingested from URL";
+  const buyerName = buyer?.trim() || fetchResult.buyer || null;
+  const descriptionText = fetchResult.description || extractedText.slice(0, 4000);
 
   // 2. Insert opportunity
   const { data: opportunity, error: oppErr } = await supabase
@@ -267,11 +401,12 @@ export async function ingestTenderFromUrl(args: {
       workspace_id: workspaceId,
       created_by: userId,
       title,
-      buyer: buyer?.trim() || null,
+      buyer: buyerName,
       source_type: "url",
       source_url: url,
+      deadline: fetchResult.deadline || null,
       scope: extractedText.slice(0, 4000),
-      description: extractedText.slice(0, 4000),
+      description: descriptionText,
       status: "analyzing",
       analysis_status: "processing",
       analysis_stage: "EXTRACTION",

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CurrencyCombobox } from "@/components/ui/currency-combobox";
 import {
   Card,
   CardContent,
@@ -423,12 +424,7 @@ function OnboardingPage() {
                       <Label htmlFor="c-curr" className="text-xs">
                         Currency
                       </Label>
-                      <Input
-                        id="c-curr"
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
-                        placeholder="USD"
-                      />
+                      <CurrencyCombobox value={currency} onChange={setCurrency} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="c-min" className="text-xs">
@@ -548,8 +544,8 @@ function OnboardingPage() {
                       className="text-sm leading-relaxed"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      The more detail provided, the higher the confidence of Phase 2 requirement
-                      matching.
+                      The more detail you provide, the more accurately we can match your
+                      capabilities to tender requirements.
                     </p>
                   </div>
                 </CardContent>

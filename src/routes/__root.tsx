@@ -84,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "AI-powered tender intelligence, automated requirement extraction, deterministic bid/no-bid qualification scoring, and verified company evidence retrieval.",
+          "AI-powered tender intelligence, automated requirement extraction, evidence-based bid/no-bid qualification scoring, and verified company evidence retrieval.",
       },
       {
         name: "keywords",
@@ -105,7 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Automate tender analysis, extract mandatory requirements in seconds, match against your corporate knowledge base, and receive deterministic bid/no-bid recommendations.",
+          "Automate tender analysis, extract mandatory requirements in seconds, match against your corporate knowledge base, and receive evidence-based bid/no-bid recommendations.",
       },
       { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -116,7 +116,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "Automate tender analysis, extract mandatory requirements in seconds, and receive deterministic bid/no-bid recommendations backed by verified evidence.",
+          "Automate tender analysis, extract mandatory requirements in seconds, and receive evidence-based bid/no-bid recommendations backed by verified evidence.",
       },
     ],
     links: [

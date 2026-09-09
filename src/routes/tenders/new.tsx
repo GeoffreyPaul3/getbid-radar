@@ -191,7 +191,7 @@ function NewTenderPage() {
             <span className="text-[11px] font-mono text-muted-foreground">Two-Mode Ingestion</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Ingest Tender Specification
+            Analyse Tender Documents
           </h1>
           <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Upload the tender document package or enter a public portal URL. Requirements will be

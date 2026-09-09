@@ -50,7 +50,7 @@ function LandingPage() {
                 How It Works
               </a>
               <a href="#qualification" className="hover:text-foreground transition-colors">
-                Qualification Engine
+                Qualification
               </a>
               <a href="#trust" className="hover:text-foreground transition-colors">
                 Enterprise Trust
@@ -198,7 +198,7 @@ function LandingPage() {
                     <span className="font-semibold text-foreground">
                       Eight-Factor Evaluation Breakdown
                     </span>
-                    <span className="text-muted-foreground font-mono">Deterministic Engine</span>
+                    <span className="text-muted-foreground font-mono">Qualification Score</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-surface-muted/40">
@@ -243,8 +243,8 @@ function LandingPage() {
 
             {/* Micro-caption */}
             <p className="text-center text-xs text-muted-foreground font-mono mt-3">
-              Illustrative GetBidRadar contract report composition. Real decisions calculated via
-              deterministic engine.
+              Illustrative GetBidRadar contract report. Scores are computed from your company
+              profile.
             </p>
           </div>
         </div>
@@ -328,12 +328,9 @@ function LandingPage() {
                 <span className="text-xs font-mono font-bold text-primary block mb-2">
                   STAGE 01
                 </span>
-                <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                  Ingest Tender
-                </h3>
+                <h3 className="font-display font-bold text-lg text-foreground mb-2">Add Tender</h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
-                  Upload tender PDF/DOCX or provide a public URL. Ingestion operates under strict
-                  SSRF protection and isolated storage.
+                  Upload tender PDF/DOCX or provide a public URL to get started.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
@@ -355,7 +352,7 @@ function LandingPage() {
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
-                Zod Schema Validated
+                Validated Extraction
               </div>
             </div>
 
@@ -386,12 +383,12 @@ function LandingPage() {
                   Decision Report
                 </h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
-                  A deterministic scoring engine produces an unequivocal BID, REVIEW, or NO-BID
-                  signal with citations, blockers, and next steps.
+                  A scoring engine produces a BID, REVIEW, or NO-BID recommendation with citations,
+                  blockers, and next steps.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-bid font-bold">
-                Deterministic Authority
+                Scored Recommendation
               </div>
             </div>
           </div>
@@ -403,11 +400,11 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <h2 className="font-display font-bold text-2xl sm:text-4xl text-foreground tracking-tight mb-4">
-              Eight deterministic decision dimensions.
+              Eight qualification dimensions.
             </h2>
             <p className="text-base text-text-secondary">
-              The AI models evaluate qualitative compatibility; the deterministic engine computes
-              the final qualification verdict with mathematically weighted rigor.
+              AI evaluates qualitative factors and your company evidence; the scoring engine
+              computes the final qualification verdict.
             </p>
           </div>
 

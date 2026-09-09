@@ -67,3 +67,48 @@ describe("SSRF Protection & URL Validation", () => {
     expect(r3.valid).toBe(false);
   });
 });
+
+describe("Tender URL Ingestion & Extraction", () => {
+  it("extracts clean metadata from HTML including title, description, buyer, and deadline", async () => {
+    const { extractHtmlMetadata } = await import("./tender-intake.server");
+    const sampleHtml = `
+      <!doctype html>
+      <html>
+        <head>
+          <title>World Bank Small AI Hackathon Challenge 2026 – Global AI &amp; Digital Summit (Seoul, South Korea) — Youth Growth Portal</title>
+          <meta property="og:title" content="World Bank Small AI Hackathon Challenge 2026 – Global AI &amp; Digital Summit (Seoul, South Korea) — Youth Growth Portal" />
+          <meta property="og:description" content="The World Bank Group is launching the Small AI for Development Hackathon Challenge..." />
+          <meta property="og:site_name" content="Youth Growth Portal" />
+        </head>
+        <body>
+          <h1>World Bank Small AI Hackathon Challenge 2026</h1>
+          <p>Deadline: September 25, 2026</p>
+          <p>Eligibility: Open to all innovators.</p>
+        </body>
+      </html>
+    `;
+
+    const meta = extractHtmlMetadata(sampleHtml);
+    expect(meta.title).toBe(
+      "World Bank Small AI Hackathon Challenge 2026 – Global AI & Digital Summit (Seoul, South Korea)",
+    );
+    expect(meta.buyer).toBe("Youth Growth Portal");
+    expect(meta.description).toContain("World Bank Group");
+    expect(meta.deadline).toBe("2026-09-25");
+  });
+
+  it("extracts readable tender content and metadata from the Youth Growth Portal regression fixture URL", async () => {
+    const { fetchSafeTenderUrl } = await import("./tender-intake.server");
+    const targetUrl =
+      "https://youthgrowthportal.org/opportunity/world-bank-small-ai-hackathon-2026-seoul";
+
+    const result = await fetchSafeTenderUrl(targetUrl);
+    expect(result.ok).toBe(true);
+    expect(result.title).toContain("World Bank Small AI Hackathon");
+    expect(result.text).toBeDefined();
+    expect(result.text!.length).toBeGreaterThan(500);
+    // Ensure key tender sections are present in the extracted text
+    const textLower = result.text!.toLowerCase();
+    expect(textLower.includes("eligibility") || textLower.includes("world bank")).toBe(true);
+  }, 20000);
+});

@@ -302,8 +302,7 @@ function RequirementsMatrixPage() {
             <span>Requirements Compliance Matrix</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Line-by-line RFP requirements extracted by the Phase 2 AI engine, mapped to verified
-            company facts.
+            Tender requirements extracted by AI, mapped to verified company evidence.
           </p>
         </div>
 

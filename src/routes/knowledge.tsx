@@ -167,8 +167,8 @@ function KnowledgeBasePage() {
               Corporate Evidence Base
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Maintain the verified corporate qualification documents, certifications, and case
-              studies used by the Phase 2 evidence matcher.
+              Maintain the verified corporate documents, certifications, and case studies used to
+              evidence your company's qualification during analysis.
             </p>
           </div>
 

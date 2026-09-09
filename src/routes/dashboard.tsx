@@ -555,7 +555,7 @@ function DashboardPage() {
                   Recent Qualification Audit Stream
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Immutable event stream logged by the workspace qualification engine.
+                  A chronological log of all analysis and qualification activity in your workspace.
                 </p>
               </div>
               <span className="text-xs font-mono text-muted-foreground">Audit Trail</span>

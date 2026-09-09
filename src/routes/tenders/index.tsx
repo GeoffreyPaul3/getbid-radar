@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -15,20 +15,41 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Search,
   PlusCircle,
-  FileText,
   Clock,
   Building2,
-  ChevronRight,
   Loader2,
-  AlertTriangle,
   CheckCircle2,
   HelpCircle,
   XCircle,
   Briefcase,
   X,
+  MoreHorizontal,
+  BarChart2,
+  Eye,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
@@ -37,6 +58,8 @@ type OpportunityAnalysis = Database["public"]["Tables"]["opportunity_analyses"][
 interface OpportunityListItem extends Opportunity {
   latest_analysis?: OpportunityAnalysis | null;
 }
+
+const PAGE_SIZE = 10;
 
 export const Route = createFileRoute("/tenders/")({
   component: TendersListPage,
@@ -120,53 +143,81 @@ function TendersListPage() {
   const [activeTab, setActiveTab] = useState<"all" | "bid" | "review" | "no_bid" | "pursuing">(
     "all",
   );
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<OpportunityListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const loadOpportunities = useCallback(async () => {
+    if (!workspace) return;
+    setIsLoading(true);
+    try {
+      const { data: opps, error: oppErr } = await supabase
+        .from("opportunities")
+        .select("*")
+        .eq("workspace_id", workspace.id)
+        .order("created_at", { ascending: false });
+
+      if (oppErr) throw oppErr;
+
+      if (!opps || opps.length === 0) {
+        setOpportunities([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const oppIds = opps.map((o) => o.id);
+      const { data: analyses, error: anErr } = await supabase
+        .from("opportunity_analyses")
+        .select("*")
+        .in("opportunity_id", oppIds)
+        .order("version", { ascending: false });
+
+      if (anErr) console.warn("[Tenders] Error loading analyses:", anErr.message);
+
+      const merged: OpportunityListItem[] = opps.map((opp) => {
+        const latest = analyses?.find((a) => a.opportunity_id === opp.id) ?? null;
+        return { ...opp, latest_analysis: latest };
+      });
+
+      setOpportunities(merged);
+    } catch (err) {
+      console.error("[Tenders] Load failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [workspace]);
 
   useEffect(() => {
-    async function loadOpportunities() {
-      if (!workspace) return;
-      setIsLoading(true);
-      try {
-        const { data: opps, error: oppErr } = await supabase
-          .from("opportunities")
-          .select("*")
-          .eq("workspace_id", workspace.id)
-          .order("created_at", { ascending: false });
-
-        if (oppErr) throw oppErr;
-
-        if (!opps || opps.length === 0) {
-          setOpportunities([]);
-          setIsLoading(false);
-          return;
-        }
-
-        const oppIds = opps.map((o) => o.id);
-        const { data: analyses, error: anErr } = await supabase
-          .from("opportunity_analyses")
-          .select("*")
-          .in("opportunity_id", oppIds)
-          .order("version", { ascending: false });
-
-        if (anErr) console.warn("[Tenders] Error loading analyses:", anErr.message);
-
-        const merged: OpportunityListItem[] = opps.map((opp) => {
-          const latest = analyses?.find((a) => a.opportunity_id === opp.id) ?? null;
-          return {
-            ...opp,
-            latest_analysis: latest,
-          };
-        });
-
-        setOpportunities(merged);
-      } catch (err) {
-        console.error("[Tenders] Load failed:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     loadOpportunities();
-  }, [workspace]);
+  }, [loadOpportunities]);
+
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeTab]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget || !workspace) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("opportunities")
+        .delete()
+        .eq("id", deleteTarget.id)
+        .eq("workspace_id", workspace.id);
+
+      if (error) throw error;
+      toast.success(`"${deleteTarget.title}" has been deleted.`);
+      setDeleteTarget(null);
+      await loadOpportunities();
+    } catch (err) {
+      toast.error("Failed to delete tender", { description: (err as Error).message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const filtered = opportunities.filter((item) => {
     const matchesSearch =
@@ -187,6 +238,9 @@ function TendersListPage() {
     return matchesSearch && matchesTab;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <AppShell>
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -203,7 +257,7 @@ function TendersListPage() {
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-              Evaluated Tenders & RFPs
+              Evaluated Tenders &amp; RFPs
             </h1>
           </div>
           <Button
@@ -211,7 +265,7 @@ function TendersListPage() {
             className="bg-primary text-white hover:bg-primary-bright shadow-subtle h-9 text-xs"
           >
             <Link to="/tenders/new">
-              <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Ingest Tender
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Analyse New Tender
             </Link>
           </Button>
         </div>
@@ -259,7 +313,7 @@ function TendersListPage() {
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                     activeTab === tab.id
                       ? "bg-white/20 text-white"
                       : "bg-surface-muted text-muted-foreground"
@@ -292,7 +346,7 @@ function TendersListPage() {
           </div>
         </div>
 
-        {/* Operational Table */}
+        {/* Table */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16 bg-surface rounded-xl border border-border">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
@@ -307,18 +361,18 @@ function TendersListPage() {
               <h3 className="font-display font-semibold text-base text-foreground">
                 {searchQuery || activeTab !== "all"
                   ? "No Matching Contracts Found"
-                  : "No Tenders Ingested Yet"}
+                  : "No Tenders Added Yet"}
               </h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                 {searchQuery || activeTab !== "all"
                   ? "Try resetting your search query or switching the status filter."
-                  : "Ingest a tender document package or public URL to view deterministic qualification results."}
+                  : "Add a tender document or URL to start evaluating your qualification and bid chances."}
               </p>
             </div>
             {!(searchQuery || activeTab !== "all") && (
               <Button asChild size="sm" className="bg-primary text-white hover:bg-primary-bright">
                 <Link to="/tenders/new">
-                  <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Ingest First Tender
+                  <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Analyse First Tender
                 </Link>
               </Button>
             )}
@@ -328,16 +382,16 @@ function TendersListPage() {
             <Table className="min-w-[700px] w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%] min-w-[240px]">Tender Title & Buyer</TableHead>
+                  <TableHead className="w-[40%] min-w-[240px]">Tender Title &amp; Buyer</TableHead>
                   <TableHead className="w-[14%] min-w-[120px]">Recommendation</TableHead>
                   <TableHead className="w-[11%] min-w-[90px]">Score</TableHead>
                   <TableHead className="w-[12%] min-w-[100px]">Deadline</TableHead>
                   <TableHead className="w-[11%] min-w-[100px]">Pursuit</TableHead>
-                  <TableHead className="w-[12%] min-w-[90px] text-right">Action</TableHead>
+                  <TableHead className="w-[12%] min-w-[60px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((item) => {
+                {paginated.map((item) => {
                   const hasAnalysis = Boolean(item.latest_analysis);
                   const isProcessing = item.analysis_status === "processing";
                   const score = item.latest_analysis?.bidradar_score;
@@ -365,7 +419,7 @@ function TendersListPage() {
                             </span>
                           )}
                           {item.source_type && (
-                            <span className="font-mono text-[10px] uppercase bg-surface-muted text-muted-foreground px-1.5 py-0.2 rounded border border-border/50 shrink-0">
+                            <span className="font-mono text-[10px] uppercase bg-surface-muted text-muted-foreground px-1.5 py-0.5 rounded border border-border/50 shrink-0">
                               {item.source_type}
                             </span>
                           )}
@@ -424,25 +478,146 @@ function TendersListPage() {
                       </TableCell>
 
                       <TableCell className="py-3 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                          className="h-8 text-xs font-semibold"
-                        >
-                          <Link to="/tenders/$id" params={{ id: item.id }}>
-                            Intelligence <ChevronRight className="h-3 w-3 ml-0.5" />
-                          </Link>
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                              aria-label="Tender actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem asChild>
+                              <Link
+                                to="/tenders/$id"
+                                params={{ id: item.id }}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <BarChart2 className="h-3.5 w-3.5 text-primary" />
+                                <span>View Analysis</span>
+                              </Link>
+                            </DropdownMenuItem>
+                            {item.source_url && (
+                              <DropdownMenuItem asChild>
+                                <a
+                                  href={item.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span>View Original</span>
+                                </a>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer"
+                              onClick={() => setDeleteTarget(item)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Delete Tender</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-surface">
+                <span className="text-xs text-muted-foreground font-mono">
+                  Page {currentPage} of {totalPages} &middot; {filtered.length} results
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) =>
+                      p === "..." ? (
+                        <span key={`ellipsis-${i}`} className="text-xs text-muted-foreground px-1">
+                          …
+                        </span>
+                      ) : (
+                        <Button
+                          key={p}
+                          variant={currentPage === p ? "default" : "outline"}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => setCurrentPage(p as number)}
+                        >
+                          {p}
+                        </Button>
+                      ),
+                    )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this tender?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong className="text-foreground">{deleteTarget?.title}</strong> and all its
+              analysis results will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Delete Tender
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }

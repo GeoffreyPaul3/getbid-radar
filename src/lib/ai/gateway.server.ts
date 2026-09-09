@@ -17,13 +17,20 @@
  *   - No client-provided system prompt is ever accepted.
  */
 import { z } from "zod";
+import { GoogleGenAI } from "@google/genai";
 import { ensureServerEnv } from "../server-env";
 
 // ──────────────────────────────────────────────────────────────
 // Provider constants
 // ──────────────────────────────────────────────────────────────
 
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+export const DEFAULT_GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+] as const;
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
@@ -34,6 +41,23 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completion
 
 /** @deprecated Alias kept so existing imports don't break. Use GEMINI_BASE_URL. */
 export const DEFAULT_MODEL = DEFAULT_GEMINI_MODEL;
+
+/**
+ * Returns the centralized, task-compatible Gemini model pool.
+ * Prioritizes text understanding, long tender context, and structured JSON output.
+ */
+export function getGeminiModelPool(preferredModel?: string): string[] {
+  const envModels = process.env["GEMINI_MODELS"]
+    ? process.env["GEMINI_MODELS"]
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const pool = envModels.length > 0 ? envModels : [...DEFAULT_GEMINI_MODELS];
+  const first = preferredModel || process.env["GEMINI_MODEL"] || pool[0]!;
+  return [first, ...pool.filter((m) => m !== first)];
+}
 
 // ──────────────────────────────────────────────────────────────
 // Public types
@@ -131,22 +155,135 @@ export function recoverJson(raw: string): unknown | undefined {
 }
 
 /**
- * Clean JSON schema for Google Gemini API.
- * Strips unsupported properties like `$schema` and `additionalProperties` which
- * cause INVALID_ARGUMENT errors in Gemini v1beta.
+ * Dedicated Gemini-compatible schema conversion layer.
+ * Converts JSON Schema (Draft 7 / 2020-12 / Zod-generated) into the strict
+ * OpenAPI 3.0 / Protobuf Schema subset accepted by Google's Gemini API:
+ * - Maps string, number, integer, boolean, array, object to uppercase Type
+ * - Normalizes { type: ["string", "null"] } to { type: "STRING", nullable: true }
+ * - Recursively processes properties, items, required, enums, descriptions
+ * - Strips unsupported properties ($schema, additionalProperties, $id, etc.)
+ */
+export function toGeminiSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(toGeminiSchema);
+
+  const raw = schema as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+
+  let isNullable = raw["nullable"] === true;
+  let type = raw["type"];
+
+  // Normalize JSON Schema array types: e.g. ["string", "null"], ["integer", "null"]
+  if (Array.isArray(type)) {
+    if (type.includes("null")) {
+      isNullable = true;
+    }
+    const nonNullType = type.find((t) => t !== "null");
+    type = typeof nonNullType === "string" ? nonNullType : "string";
+  }
+
+  // Convert type to valid Gemini uppercase Type
+  if (typeof type === "string") {
+    const upper = type.toUpperCase();
+    if (["STRING", "NUMBER", "INTEGER", "BOOLEAN", "ARRAY", "OBJECT"].includes(upper)) {
+      out["type"] = upper;
+    } else {
+      out["type"] = "STRING";
+    }
+  }
+
+  if (isNullable) {
+    out["nullable"] = true;
+  }
+
+  if (typeof raw["description"] === "string" && raw["description"].trim()) {
+    out["description"] = raw["description"].trim();
+  }
+
+  if (Array.isArray(raw["enum"])) {
+    out["enum"] = raw["enum"].map(String);
+    if (!out["type"]) {
+      out["type"] = "STRING";
+    }
+  }
+
+  if (
+    raw["properties"] &&
+    typeof raw["properties"] === "object" &&
+    !Array.isArray(raw["properties"])
+  ) {
+    const props: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw["properties"] as Record<string, unknown>)) {
+      props[k] = toGeminiSchema(v);
+    }
+    out["properties"] = props;
+  }
+
+  if (raw["items"] && typeof raw["items"] === "object") {
+    out["items"] = toGeminiSchema(raw["items"]);
+  }
+
+  if (Array.isArray(raw["required"])) {
+    out["required"] = raw["required"].filter((r): r is string => typeof r === "string");
+  }
+
+  return out;
+}
+
+/**
+ * Validates that a converted schema strictly adheres to Gemini protobuf schema rules:
+ * - No array for `type`
+ * - Type is a recognized uppercase string
+ * - `properties` are key-value objects, not array of objects
+ */
+export function validateGeminiSchema(
+  schema: unknown,
+  path = "schema",
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (!schema || typeof schema !== "object") {
+    errors.push(`${path}: must be an object`);
+    return { valid: false, errors };
+  }
+
+  const s = schema as Record<string, unknown>;
+  if (Array.isArray(s["type"])) {
+    errors.push(
+      `${path}.type: Proto field is not repeating, cannot be an array: ${JSON.stringify(s["type"])}`,
+    );
+  }
+
+  const validTypes = ["STRING", "NUMBER", "INTEGER", "BOOLEAN", "ARRAY", "OBJECT"];
+  if (typeof s["type"] === "string" && !validTypes.includes(s["type"])) {
+    errors.push(
+      `${path}.type: Unknown type "${s["type"]}", must be one of ${validTypes.join(", ")}`,
+    );
+  }
+
+  if (s["properties"]) {
+    if (typeof s["properties"] !== "object" || Array.isArray(s["properties"])) {
+      errors.push(`${path}.properties: must be a key-value object`);
+    } else {
+      for (const [k, v] of Object.entries(s["properties"] as Record<string, unknown>)) {
+        const sub = validateGeminiSchema(v, `${path}.properties.${k}`);
+        if (!sub.valid) errors.push(...sub.errors);
+      }
+    }
+  }
+
+  if (s["items"]) {
+    const sub = validateGeminiSchema(s["items"], `${path}.items`);
+    if (!sub.valid) errors.push(...sub.errors);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Backward compatibility alias for cleanSchemaForGemini.
  */
 export function cleanSchemaForGemini(schema: unknown): unknown {
-  if (!schema || typeof schema !== "object") return schema;
-  if (Array.isArray(schema)) return schema.map(cleanSchemaForGemini);
-
-  const cleaned: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
-    if (k === "$schema" || k === "additionalProperties") {
-      continue;
-    }
-    cleaned[k] = cleanSchemaForGemini(v);
-  }
-  return cleaned;
+  return toGeminiSchema(schema);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -174,146 +311,148 @@ interface ProviderAdapter {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 1. Google Gemini 2.5 Flash
+// 1. Google Gemini (Official @google/genai SDK with model pool cascade)
 // ──────────────────────────────────────────────────────────────
 
 class GeminiProviderAdapter implements ProviderAdapter {
   readonly name = "gemini" as const;
 
-  async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
-    const baseUrl = process.env["GEMINI_BASE_URL"] || GEMINI_BASE_URL;
-    const url = `${baseUrl}/${encodeURIComponent(model)}:generateContent`;
+  async execute<T>(
+    options: AiCallOptions<T>,
+    apiKey: string,
+    preferredModel: string,
+    timeoutMs: number,
+  ): Promise<ProviderAdapterResult> {
+    const sanitizedSchema = toGeminiSchema(options.jsonSchema);
+    const schemaValidation = validateGeminiSchema(sanitizedSchema);
+    if (!schemaValidation.valid) {
+      return {
+        ok: false,
+        code: "validation_failed",
+        message: `Internal Gemini schema validation failed: ${schemaValidation.errors.join("; ")}`,
+        retryable: false,
+      };
+    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const sanitizedSchema = cleanSchemaForGemini(options.jsonSchema);
+    const ai = new GoogleGenAI({ apiKey });
+    const modelPool = getGeminiModelPool(preferredModel);
 
-    const requestBody = {
-      system_instruction: { parts: [{ text: options.system }] },
-      contents: [{ role: "user", parts: [{ text: options.user }] }],
-      generationConfig: {
-        temperature: options.temperature ?? 0.1,
-        responseMimeType: "application/json",
-        responseSchema: sanitizedSchema,
-      },
-    };
+    let lastErrorMsg = "Gemini API call failed.";
+    let lastCode: AiFailureCode = "provider_error";
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(requestBody),
-      });
+    for (const currentModel of modelPool) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (response.status === 429) {
-        return {
-          ok: false as const,
-          code: "rate_limited" as const,
-          message: "Gemini API rate limit reached.",
-          retryable: false,
-        };
-      }
+      try {
+        const response = await ai.models.generateContent({
+          model: currentModel,
+          contents: [{ role: "user", parts: [{ text: options.user }] }],
+          config: {
+            systemInstruction: { parts: [{ text: options.system }] },
+            responseMimeType: "application/json",
+            responseSchema: sanitizedSchema as never,
+            temperature: options.temperature ?? 0.1,
+          },
+        });
+        clearTimeout(timer);
 
-      if (response.status === 503) {
-        return {
-          ok: false as const,
-          code: "provider_unavailable" as const,
-          message: "Gemini API service is temporarily unavailable.",
-          retryable: true,
-        };
-      }
-
-      if (!response.ok) {
-        let errorBody: { error?: { message?: string; status?: string } } | undefined;
-        try {
-          errorBody = (await response.json()) as typeof errorBody;
-        } catch {
-          /* ignore non-json error */
+        const rawText = response.text;
+        if (!rawText) {
+          lastCode = "malformed_response";
+          lastErrorMsg = `Gemini model ${currentModel} returned an empty candidate response.`;
+          continue;
         }
-        const rawMsg = errorBody?.error?.message ?? `Gemini returned status ${response.status}`;
+
+        return {
+          ok: true,
+          rawText,
+          promptTokens: response.usageMetadata?.promptTokenCount,
+          completionTokens: response.usageMetadata?.candidatesTokenCount,
+          totalTokens: response.usageMetadata?.totalTokenCount,
+        };
+      } catch (error) {
+        clearTimeout(timer);
+        const errObj = error as { status?: number; message?: string; name?: string };
+        const rawMsg = errObj.message ?? String(error);
         const errorMsg = maskSecrets(rawMsg, [apiKey]);
+        lastErrorMsg = errorMsg;
 
         if (
-          (response.status === 400 &&
+          errObj.name === "AbortError" ||
+          errorMsg.includes("abort") ||
+          errorMsg.includes("timed out")
+        ) {
+          lastCode = "timeout";
+          lastErrorMsg = errorMsg.includes("timed out")
+            ? errorMsg
+            : `Gemini request timed out after ${timeoutMs}ms.`;
+          console.warn(
+            `[Gemini] Model ${currentModel} timed out after ${timeoutMs}ms. Trying next Gemini model in pool...`,
+          );
+          continue;
+        }
+
+        // Authentication failure — stop immediately, do not cascade across other models
+        if (
+          (errObj.status === 400 &&
             (errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID"))) ||
-          response.status === 401 ||
-          response.status === 403 ||
+          errObj.status === 401 ||
+          errObj.status === 403 ||
           errorMsg.includes("PERMISSION_DENIED")
         ) {
           return {
-            ok: false as const,
-            code: "authentication_failed" as const,
+            ok: false,
+            code: "authentication_failed",
             message: "Invalid Gemini API key or permission denied.",
             retryable: false,
           };
         }
-        if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota")) {
+
+        // Rate limit or Quota exhaustion (account-level) — cascade immediately to Groq
+        if (
+          errObj.status === 429 ||
+          errorMsg.includes("RESOURCE_EXHAUSTED") ||
+          errorMsg.includes("quota") ||
+          errorMsg.includes("rate limit") ||
+          errorMsg.includes("429")
+        ) {
           return {
-            ok: false as const,
-            code: "payment_required" as const,
-            message: "Gemini API quota exceeded.",
+            ok: false,
+            code: "rate_limited",
+            message: "Gemini rate limit or quota exceeded.",
             retryable: false,
           };
         }
-        return {
-          ok: false as const,
-          code:
-            response.status === 503
-              ? ("provider_unavailable" as const)
-              : ("provider_error" as const),
-          message: errorMsg,
-          retryable: response.status >= 500,
-        };
-      }
 
-      const body = (await response.json()) as {
-        candidates?: Array<{
-          content?: { parts?: Array<{ text?: string }> };
-          finishReason?: string;
-        }>;
-        usageMetadata?: {
-          promptTokenCount?: number;
-          candidatesTokenCount?: number;
-          totalTokenCount?: number;
-        };
-      };
+        // 404 (model deprecated / unavailable), 503 (high demand / overloaded)
+        const isUnavailable =
+          errObj.status === 503 ||
+          errObj.status === 404 ||
+          errorMsg.includes("UNAVAILABLE") ||
+          errorMsg.includes("high demand") ||
+          errorMsg.includes("NOT_FOUND");
 
-      const rawText = body.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawText) {
-        return {
-          ok: false as const,
-          code: "malformed_response" as const,
-          message: "Gemini returned an empty candidate response.",
-          retryable: false,
-        };
-      }
+        if (isUnavailable) {
+          lastCode = "provider_unavailable";
+          console.warn(
+            `[Gemini] Model ${currentModel} returned ${lastCode} (${errorMsg}). Trying next model in pool...`,
+          );
+          continue;
+        }
 
-      return {
-        ok: true as const,
-        rawText,
-        promptTokens: body.usageMetadata?.promptTokenCount,
-        completionTokens: body.usageMetadata?.candidatesTokenCount,
-        totalTokens: body.usageMetadata?.totalTokenCount,
-      };
-    } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        return {
-          ok: false as const,
-          code: "timeout" as const,
-          message: `Gemini API request timed out after ${timeoutMs}ms.`,
-          retryable: false,
-        };
+        lastCode = "provider_error";
+        break;
       }
-      return {
-        ok: false as const,
-        code: "provider_error" as const,
-        message: maskSecrets((error as Error).message, [apiKey]),
-        retryable: true,
-      };
-    } finally {
-      clearTimeout(timer);
     }
+
+    // Gemini attempt finished
+    return {
+      ok: false,
+      code: lastCode,
+      message: lastErrorMsg,
+      retryable: lastCode === "provider_unavailable" || lastCode === "provider_error",
+    };
   }
 }
 

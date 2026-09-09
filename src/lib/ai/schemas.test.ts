@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { toGeminiSchema, validateGeminiSchema } from "./gateway.server";
 import {
+  bidAssessmentJsonSchema,
   bidAssessmentSchema,
+  companyMatchingJsonSchema,
   companyMatchingSchema,
   extractedRequirementSchema,
+  requirementExtractionJsonSchema,
   requirementExtractionSchema,
   requirementMatchSchema,
 } from "./schemas";
@@ -175,5 +179,60 @@ describe("assessment schema", () => {
         risks: [{ title: "t", severity: "apocalyptic", detail: "" }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("Gemini schema converter & protobuf compatibility", () => {
+  it("converts requirementExtractionJsonSchema to strict Gemini protobuf format", () => {
+    const raw = requirementExtractionJsonSchema as Record<string, unknown>;
+    // Before conversion, array types like ["string", "null"] exist and fail protobuf validation
+    const preValidation = validateGeminiSchema(raw);
+    expect(preValidation.valid).toBe(false);
+
+    const converted = toGeminiSchema(raw) as Record<string, any>;
+    const validation = validateGeminiSchema(converted);
+    expect(validation.valid).toBe(true);
+    expect(validation.errors).toHaveLength(0);
+
+    // Assert converted types
+    expect(converted["type"]).toBe("OBJECT");
+    const reqItemProps = converted["properties"].requirements.items.properties;
+    expect(reqItemProps.title.type).toBe("STRING");
+    expect(reqItemProps.is_mandatory.type).toBe("BOOLEAN");
+    expect(reqItemProps.source_document.type).toBe("STRING");
+    expect(reqItemProps.source_document.nullable).toBe(true);
+    expect(Array.isArray(reqItemProps.source_document.type)).toBe(false);
+    expect(reqItemProps.source_page.type).toBe("INTEGER");
+    expect(reqItemProps.source_page.nullable).toBe(true);
+  });
+
+  it("converts companyMatchingJsonSchema to strict Gemini protobuf format", () => {
+    const raw = companyMatchingJsonSchema as Record<string, unknown>;
+    const converted = toGeminiSchema(raw) as Record<string, any>;
+    const validation = validateGeminiSchema(converted);
+    expect(validation.valid).toBe(true);
+    expect(validation.errors).toHaveLength(0);
+
+    const matchProps = converted["properties"].matches.items.properties;
+    expect(matchProps.verdict.enum).toBeDefined();
+    expect(matchProps.verdict.type).toBe("STRING");
+    expect(matchProps.action_required.nullable).toBe(true);
+    expect(Array.isArray(matchProps.action_required.type)).toBe(false);
+  });
+
+  it("converts bidAssessmentJsonSchema to strict Gemini protobuf format", () => {
+    const raw = bidAssessmentJsonSchema as Record<string, unknown>;
+    const converted = toGeminiSchema(raw) as Record<string, any>;
+    const validation = validateGeminiSchema(converted);
+    expect(validation.valid).toBe(true);
+    expect(validation.errors).toHaveLength(0);
+
+    expect(converted["properties"].estimated_effort_hours_min.nullable).toBe(true);
+    expect(converted["properties"].estimated_effort_hours_min.type).toBe("NUMBER");
+    expect(Array.isArray(converted["properties"].estimated_effort_hours_min.type)).toBe(false);
+
+    expect(converted["properties"].estimated_effort_hours_max.nullable).toBe(true);
+    expect(converted["properties"].estimated_effort_hours_max.type).toBe("NUMBER");
+    expect(Array.isArray(converted["properties"].estimated_effort_hours_max.type)).toBe(false);
   });
 });

@@ -131,7 +131,7 @@ function BillingPage() {
               Subscription & Entitlements
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Deterministic qualification capacity and enterprise workspace management.
+              Manage your subscription plan and tender analysis allowance.
             </p>
           </div>
 
@@ -192,7 +192,7 @@ function BillingPage() {
                     ? "Unlimited"
                     : `${currentPlanConfig.analysisAllowance} analyses/mo`}
                 </div>
-                <p className="text-xs text-muted-foreground">Deterministic qualification runs</p>
+                <p className="text-xs text-muted-foreground">Tender analyses per month</p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">

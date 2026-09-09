@@ -21,6 +21,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,7 +42,6 @@ import {
   Building2,
   Users,
   Shield,
-  Sparkles,
   Loader2,
   Save,
   Gauge,
@@ -41,7 +51,6 @@ import {
   UserPlus,
   Mail,
   Trash2,
-  Cpu,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -61,6 +70,7 @@ import {
   revokeInvitationFn,
 } from "@/lib/members/members.functions";
 import type { WorkspaceMemberRecord, AppRole } from "@/lib/members/members.server";
+import { CurrencyCombobox } from "@/components/ui/currency-combobox";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -115,6 +125,31 @@ function SettingsPage() {
     }
   }, [workspace]);
 
+  // Sync companyProfile into form state on load
+  useEffect(() => {
+    if (companyProfile) {
+      setCompanyName(companyProfile.company_name || "");
+      setLegalName(companyProfile.legal_name || "");
+      setIndustry(companyProfile.industry || "");
+      setCountry(companyProfile.country || "");
+      setWebsite(companyProfile.website || "");
+      setEmployeeCount(companyProfile.employee_count ?? "");
+      setYearsInOperation(companyProfile.years_in_operation ?? "");
+      const minVal =
+        companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
+      const maxVal =
+        companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
+      setMinContractValue(minVal);
+      setMaxContractValue(maxVal);
+      setMinContractDisplay(minVal === "" ? "" : Number(minVal).toLocaleString());
+      setMaxContractDisplay(maxVal === "" ? "" : Number(maxVal).toLocaleString());
+      setCurrency(companyProfile.currency || "USD");
+      setPreferredIndustries((companyProfile.preferred_industries || []).join(", "));
+      setPreferredRegions((companyProfile.preferred_regions || []).join(", "));
+      setDescription(companyProfile.description || "");
+    }
+  }, [companyProfile]);
+
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
@@ -160,7 +195,6 @@ function SettingsPage() {
 
   const handleRemoveMember = async (targetMemberId: string) => {
     if (!workspace) return;
-    if (!window.confirm("Are you sure you want to remove this member from the workspace?")) return;
     try {
       const res = await removeMemberFn({
         data: { workspaceId: workspace.id, targetMemberId },
@@ -299,8 +333,8 @@ function SettingsPage() {
                     Company Qualification Profile
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    These parameters are fed directly into the Phase 2 evidence retriever to compute
-                    Capability, Experience, and Commercial Fit scores.
+                    These parameters are used to qualify your company's capabilities, experience,
+                    and commercial fit against tender requirements.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-0">
@@ -395,11 +429,7 @@ function SettingsPage() {
                       <Label htmlFor="s-curr" className="text-xs">
                         Base Currency
                       </Label>
-                      <Input
-                        id="s-curr"
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
-                      />
+                      <CurrencyCombobox value={currency} onChange={setCurrency} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="s-min" className="text-xs">
@@ -732,21 +762,50 @@ function SettingsPage() {
                               </Badge>
                             )}
 
-                            {canManageMembers && !isSelf && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  m.isPending
-                                    ? handleRevokeInvitation(m.id)
-                                    : handleRemoveMember(m.id)
-                                }
-                                className="h-8 px-2 text-destructive hover:bg-destructive/10"
-                                title={m.isPending ? "Revoke invitation" : "Remove member"}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                            {canManageMembers &&
+                              !isSelf &&
+                              (m.isPending ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRevokeInvitation(m.id)}
+                                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                  title="Revoke invitation"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              ) : (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                      title="Remove member"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Remove team member?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {m.fullName} will lose access to this workspace immediately.
+                                        This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleRemoveMember(m.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Remove Member
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              ))}
                           </div>
                         </div>
                       );
@@ -756,93 +815,16 @@ function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Centralized AI Intelligence Architecture */}
-            <Card className="border border-border/80 shadow-panel bg-card">
-              <CardHeader>
-                <CardTitle className="font-display text-lg flex items-center gap-2">
-                  <Cpu className="h-5 w-5 text-accent" /> Centralized AI Gateway & Engine
-                  Architecture
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Centralized AI gateway topology, model cascade, and deterministic qualification
-                  engine.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
-                        Primary Gateway
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                      >
-                        Active
-                      </Badge>
-                    </div>
-                    <p className="font-display font-bold text-foreground">
-                      Google Gemini 2.5 Flash
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      High-speed structured extraction, requirements matrix, and evidence parsing.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
-                        Fallback 1
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
-                      >
-                        Standby
-                      </Badge>
-                    </div>
-                    <p className="font-display font-bold text-foreground">Groq (Llama 3.3 70B)</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Automatic cascade failover on provider timeouts, 429s, or service degradation.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
-                        Fallback 2
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30"
-                      >
-                        Standby
-                      </Badge>
-                    </div>
-                    <p className="font-display font-bold text-foreground">OpenRouter Gateway</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Secondary cascade failover preserving analysis continuity under peak loads.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-border/60 bg-accent/5 flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-foreground">
-                      Deterministic Scoring Authority
-                    </p>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      AI models extract tender requirements and match evidence. The BID / REVIEW /
-                      NO-BID decision is strictly computed by the deterministic scoring engine
-                      according to your organizational criteria. AI models cannot override your
-                      organization&apos;s human pursuit decision.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* AI Analysis Status — compact indicator only */}
+            <div className="flex items-center gap-2 px-1">
+              <Shield className="h-3.5 w-3.5 text-accent" />
+              <span className="text-xs text-muted-foreground">
+                AI Analysis:{" "}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  Connected
+                </span>
+              </span>
+            </div>
           </TabsContent>
 
           {/* TAB 3: Billing & Subscription Intelligence */}
@@ -855,7 +837,7 @@ function SettingsPage() {
                     Entitlement
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Deterministic capacity management and PayChangu commercial billing integration.
+                    Manage your subscription, usage limits, and renewal date.
                   </CardDescription>
                 </div>
                 <Button
