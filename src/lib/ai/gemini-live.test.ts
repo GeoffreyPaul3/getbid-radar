@@ -3,7 +3,7 @@
  * Gated by GEMINI_API_KEY environment variable — safely skips if the key is not present.
  * Never logs or asserts the raw API key.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ensureServerEnv } from "../server-env";
 import { callStructuredAi } from "./gateway.server";
 import {
@@ -22,6 +22,18 @@ const hasGeminiKey = Boolean(
 );
 
 describe.runIf(hasGeminiKey)("Live Google Gemini API structured output verification", () => {
+  let savedDashscopeKey: string | undefined;
+
+  beforeEach(() => {
+    savedDashscopeKey = process.env["DASHSCOPE_API_KEY"];
+    delete process.env["DASHSCOPE_API_KEY"];
+  });
+
+  afterEach(() => {
+    if (savedDashscopeKey !== undefined) {
+      process.env["DASHSCOPE_API_KEY"] = savedDashscopeKey;
+    }
+  });
   it("extracts requirements from live tender sample text using requirementExtractionSchema", async () => {
     const result = await callStructuredAi({
       system:

@@ -3,60 +3,65 @@
  *
  * THE ONLY place in the application that talks to an AI provider.
  *
- * Provider cascade (attempted in order, failing-over on rate_limited / payment_required / timeout):
- *   1. Google Gemini 2.5 Flash   — GEMINI_API_KEY (native structured JSON output)
- *   2. Groq                      — GROQ_API_KEY   (llama-3.3-70b-versatile, tool_calls)
- *   3. OpenRouter                — OPENROUTER_API_KEY (google/gemini-2.5-flash, JSON mode)
+ * Provider cascade (attempted in order, failing over on transient rate_limited / 5xx / timeout):
+ *   1. Qwen / DashScope (Primary)    — DASHSCOPE_API_KEY (qwen-plus, OpenAI-compatible)
+ *   2. Google Gemini (Fallback 1)     — GEMINI_API_KEY    (gemini-3.5-flash, native structured JSON)
+ *   3. Groq (Fallback 2)             — GROQ_API_KEY      (qwen/qwen3.8-27b, tool_calls)
+ *   4. OpenRouter (Fallback 3)       — OPENROUTER_API_KEY(nvidia/nemotron-3-super-120b-a12b:free, JSON mode)
  *
  * Guarantees:
  *   - All credentials stay server-side — never exposed to client bundles.
  *   - Every response is Zod-validated before it leaves this module.
- *   - Secret masking applied to all error strings.
+ *   - Secret masking applied to all error strings and logs.
  *   - Deterministic scoring engine is the sole authority for BID/REVIEW/NO-BID.
- *     Providers perform qualitative assessment only.
+ *     Providers perform qualitative assessment and requirement interpretation only.
  *   - No client-provided system prompt is ever accepted.
  */
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 import { ensureServerEnv } from "../server-env";
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODELS,
+  DEFAULT_GROQ_MODEL,
+  DEFAULT_GROQ_MODELS,
+  DEFAULT_OPENROUTER_MODEL,
+  DEFAULT_OPENROUTER_MODELS,
+  DEFAULT_QWEN_MODEL,
+  DEFAULT_QWEN_MODELS,
+  GEMINI_BASE_URL,
+  GROQ_BASE_URL,
+  OPENROUTER_BASE_URL,
+  QWEN_BASE_URL,
+  assertValidModelId,
+  getProviderModelPool,
+  type ProviderId,
+} from "./registry.server";
 
-// ──────────────────────────────────────────────────────────────
-// Provider constants
-// ──────────────────────────────────────────────────────────────
+// Re-export constants for backward compatibility
+export {
+  DEFAULT_QWEN_MODEL,
+  DEFAULT_QWEN_MODELS,
+  QWEN_BASE_URL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODELS,
+  GEMINI_BASE_URL,
+  DEFAULT_GROQ_MODEL,
+  DEFAULT_GROQ_MODELS,
+  GROQ_BASE_URL,
+  DEFAULT_OPENROUTER_MODEL,
+  DEFAULT_OPENROUTER_MODELS,
+  OPENROUTER_BASE_URL,
+};
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
-export const DEFAULT_GEMINI_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-flash-lite-latest",
-  "gemini-3.1-flash-lite",
-] as const;
-export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-
-export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
-export const GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
-
-export const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash";
-export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-/** @deprecated Alias kept so existing imports don't break. Use GEMINI_BASE_URL. */
-export const DEFAULT_MODEL = DEFAULT_GEMINI_MODEL;
+/** @deprecated Alias kept so existing imports don't break. Use DEFAULT_QWEN_MODEL or DEFAULT_GEMINI_MODEL. */
+export const DEFAULT_MODEL = DEFAULT_QWEN_MODEL;
 
 /**
- * Returns the centralized, task-compatible Gemini model pool.
- * Prioritizes text understanding, long tender context, and structured JSON output.
+ * Returns the centralized Gemini model pool.
  */
 export function getGeminiModelPool(preferredModel?: string): string[] {
-  const envModels = process.env["GEMINI_MODELS"]
-    ? process.env["GEMINI_MODELS"]
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
-
-  const pool = envModels.length > 0 ? envModels : [...DEFAULT_GEMINI_MODELS];
-  const first = preferredModel || process.env["GEMINI_MODEL"] || pool[0]!;
-  return [first, ...pool.filter((m) => m !== first)];
+  return getProviderModelPool("gemini", preferredModel);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -65,7 +70,7 @@ export function getGeminiModelPool(preferredModel?: string): string[] {
 
 export type AiUsage = {
   model: string;
-  activeProvider: "gemini" | "groq" | "openrouter";
+  activeProvider: ProviderId;
   promptTokens?: number | undefined;
   completionTokens?: number | undefined;
   totalTokens?: number | undefined;
@@ -119,7 +124,7 @@ function emptyUsage(
   return { model, activeProvider: provider, durationMs: Date.now() - started, attempts };
 }
 
-/** Recursively mask sensitive tokens from error strings. */
+/** Recursively mask sensitive tokens from error strings and logs. */
 export function maskSecrets(raw: string, secrets: (string | undefined | null)[]): string {
   let cleaned = raw;
   for (const secret of secrets) {
@@ -157,11 +162,7 @@ export function recoverJson(raw: string): unknown | undefined {
 /**
  * Dedicated Gemini-compatible schema conversion layer.
  * Converts JSON Schema (Draft 7 / 2020-12 / Zod-generated) into the strict
- * OpenAPI 3.0 / Protobuf Schema subset accepted by Google's Gemini API:
- * - Maps string, number, integer, boolean, array, object to uppercase Type
- * - Normalizes { type: ["string", "null"] } to { type: "STRING", nullable: true }
- * - Recursively processes properties, items, required, enums, descriptions
- * - Strips unsupported properties ($schema, additionalProperties, $id, etc.)
+ * OpenAPI 3.0 / Protobuf Schema subset accepted by Google's Gemini API.
  */
 export function toGeminiSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema;
@@ -173,7 +174,6 @@ export function toGeminiSchema(schema: unknown): unknown {
   let isNullable = raw["nullable"] === true;
   let type = raw["type"];
 
-  // Normalize JSON Schema array types: e.g. ["string", "null"], ["integer", "null"]
   if (Array.isArray(type)) {
     if (type.includes("null")) {
       isNullable = true;
@@ -182,7 +182,6 @@ export function toGeminiSchema(schema: unknown): unknown {
     type = typeof nonNullType === "string" ? nonNullType : "string";
   }
 
-  // Convert type to valid Gemini uppercase Type
   if (typeof type === "string") {
     const upper = type.toUpperCase();
     if (["STRING", "NUMBER", "INTEGER", "BOOLEAN", "ARRAY", "OBJECT"].includes(upper)) {
@@ -230,12 +229,6 @@ export function toGeminiSchema(schema: unknown): unknown {
   return out;
 }
 
-/**
- * Validates that a converted schema strictly adheres to Gemini protobuf schema rules:
- * - No array for `type`
- * - Type is a recognized uppercase string
- * - `properties` are key-value objects, not array of objects
- */
 export function validateGeminiSchema(
   schema: unknown,
   path = "schema",
@@ -279,9 +272,6 @@ export function validateGeminiSchema(
   return { valid: errors.length === 0, errors };
 }
 
-/**
- * Backward compatibility alias for cleanSchemaForGemini.
- */
 export function cleanSchemaForGemini(schema: unknown): unknown {
   return toGeminiSchema(schema);
 }
@@ -301,7 +291,7 @@ type ProviderAdapterResult =
   | { ok: false; code: AiFailureCode; message: string; retryable: boolean };
 
 interface ProviderAdapter {
-  readonly name: AiUsage["activeProvider"];
+  readonly name: ProviderId;
   execute<T>(
     options: AiCallOptions<T>,
     apiKey: string,
@@ -311,7 +301,145 @@ interface ProviderAdapter {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 1. Google Gemini (Official @google/genai SDK with model pool cascade)
+// 1. Qwen / DashScope (Primary — OpenAI-compatible tool_calls)
+// ──────────────────────────────────────────────────────────────
+
+class QwenProviderAdapter implements ProviderAdapter {
+  readonly name = "qwen" as const;
+
+  async execute<T>(
+    options: AiCallOptions<T>,
+    apiKey: string,
+    model: string,
+    timeoutMs: number,
+  ): Promise<ProviderAdapterResult> {
+    assertValidModelId(model);
+    const url = process.env["DASHSCOPE_BASE_URL"] || QWEN_BASE_URL;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: options.temperature ?? 0,
+          messages: [
+            { role: "system", content: options.system },
+            { role: "user", content: options.user },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: options.toolName,
+                description: options.toolDescription,
+                parameters: options.jsonSchema,
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: options.toolName } },
+        }),
+      });
+
+      if (response.status === 429) {
+        return {
+          ok: false,
+          code: "rate_limited",
+          message: "Qwen / DashScope rate limit reached.",
+          retryable: false,
+        };
+      }
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          code: "authentication_failed",
+          message: "Qwen / DashScope API authentication failed.",
+          retryable: false,
+        };
+      }
+      if (response.status === 402) {
+        return {
+          ok: false,
+          code: "payment_required",
+          message: "Qwen / DashScope credits exhausted.",
+          retryable: false,
+        };
+      }
+      if (response.status === 503 || response.status === 502) {
+        return {
+          ok: false,
+          code: "provider_unavailable",
+          message: "Qwen / DashScope service is temporarily unavailable or overloaded.",
+          retryable: true,
+        };
+      }
+      if (!response.ok) {
+        let errorMsg = `Qwen / DashScope returned status ${response.status}`;
+        try {
+          const errBody = (await response.json()) as { error?: { message?: string } };
+          if (errBody?.error?.message) {
+            errorMsg = maskSecrets(errBody.error.message, [apiKey]);
+          }
+        } catch {
+          /* ignore */
+        }
+        return {
+          ok: false,
+          code: response.status >= 500 ? "provider_unavailable" : "provider_error",
+          message: errorMsg,
+          retryable: response.status >= 500,
+        };
+      }
+
+      const body = (await response.json()) as {
+        choices?: Array<{
+          message?: {
+            content?: string | null;
+            tool_calls?: Array<{ function?: { arguments?: string } }>;
+          };
+        }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      const message = body.choices?.[0]?.message;
+      const rawText = message?.tool_calls?.[0]?.function?.arguments ?? message?.content ?? "";
+
+      return {
+        ok: true,
+        rawText,
+        promptTokens: body.usage?.prompt_tokens,
+        completionTokens: body.usage?.completion_tokens,
+        totalTokens: body.usage?.total_tokens,
+      };
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return {
+          ok: false,
+          code: "timeout",
+          message: `Qwen request timed out after ${timeoutMs}ms.`,
+          retryable: false,
+        };
+      }
+      return {
+        ok: false,
+        code: "provider_error",
+        message: maskSecrets((error as Error).message, [apiKey]),
+        retryable: true,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// 2. Google Gemini (Fallback 1 — @google/genai SDK)
 // ──────────────────────────────────────────────────────────────
 
 class GeminiProviderAdapter implements ProviderAdapter {
@@ -323,6 +451,7 @@ class GeminiProviderAdapter implements ProviderAdapter {
     preferredModel: string,
     timeoutMs: number,
   ): Promise<ProviderAdapterResult> {
+    assertValidModelId(preferredModel);
     const sanitizedSchema = toGeminiSchema(options.jsonSchema);
     const schemaValidation = validateGeminiSchema(sanitizedSchema);
     if (!schemaValidation.valid) {
@@ -393,7 +522,6 @@ class GeminiProviderAdapter implements ProviderAdapter {
           continue;
         }
 
-        // Authentication failure — stop immediately, do not cascade across other models
         if (
           (errObj.status === 400 &&
             (errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID"))) ||
@@ -409,7 +537,6 @@ class GeminiProviderAdapter implements ProviderAdapter {
           };
         }
 
-        // Rate limit or Quota exhaustion (account-level) — cascade immediately to Groq
         if (
           errObj.status === 429 ||
           errorMsg.includes("RESOURCE_EXHAUSTED") ||
@@ -425,9 +552,9 @@ class GeminiProviderAdapter implements ProviderAdapter {
           };
         }
 
-        // 404 (model deprecated / unavailable), 503 (high demand / overloaded)
         const isUnavailable =
           errObj.status === 503 ||
+          errObj.status === 500 ||
           errObj.status === 404 ||
           errorMsg.includes("UNAVAILABLE") ||
           errorMsg.includes("high demand") ||
@@ -446,7 +573,6 @@ class GeminiProviderAdapter implements ProviderAdapter {
       }
     }
 
-    // Gemini attempt finished
     return {
       ok: false,
       code: lastCode,
@@ -457,13 +583,19 @@ class GeminiProviderAdapter implements ProviderAdapter {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 2. Groq (OpenAI-compatible, tool_calls structured output)
+// 3. Groq (Fallback 2 — OpenAI-compatible tool_calls)
 // ──────────────────────────────────────────────────────────────
 
 class GroqProviderAdapter implements ProviderAdapter {
   readonly name = "groq" as const;
 
-  async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
+  async execute<T>(
+    options: AiCallOptions<T>,
+    apiKey: string,
+    model: string,
+    timeoutMs: number,
+  ): Promise<ProviderAdapterResult> {
+    assertValidModelId(model);
     const url = process.env["GROQ_BASE_URL"] || GROQ_BASE_URL;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -499,32 +631,32 @@ class GroqProviderAdapter implements ProviderAdapter {
 
       if (response.status === 429) {
         return {
-          ok: false as const,
-          code: "rate_limited" as const,
+          ok: false,
+          code: "rate_limited",
           message: "Groq rate limit reached.",
           retryable: false,
         };
       }
       if (response.status === 401 || response.status === 403) {
         return {
-          ok: false as const,
-          code: "authentication_failed" as const,
+          ok: false,
+          code: "authentication_failed",
           message: "Groq API authentication failed.",
           retryable: false,
         };
       }
       if (response.status === 402) {
         return {
-          ok: false as const,
-          code: "payment_required" as const,
+          ok: false,
+          code: "payment_required",
           message: "Groq credits exhausted.",
           retryable: false,
         };
       }
-      if (response.status === 503) {
+      if (response.status === 503 || response.status === 502) {
         return {
-          ok: false as const,
-          code: "provider_unavailable" as const,
+          ok: false,
+          code: "provider_unavailable",
           message: "Groq service is temporarily unavailable.",
           retryable: true,
         };
@@ -540,11 +672,8 @@ class GroqProviderAdapter implements ProviderAdapter {
           /* ignore */
         }
         return {
-          ok: false as const,
-          code:
-            response.status >= 500
-              ? ("provider_unavailable" as const)
-              : ("provider_error" as const),
+          ok: false,
+          code: response.status >= 500 ? "provider_unavailable" : "provider_error",
           message: errorMsg,
           retryable: response.status >= 500,
         };
@@ -564,7 +693,7 @@ class GroqProviderAdapter implements ProviderAdapter {
       const rawText = message?.tool_calls?.[0]?.function?.arguments ?? message?.content ?? "";
 
       return {
-        ok: true as const,
+        ok: true,
         rawText,
         promptTokens: body.usage?.prompt_tokens,
         completionTokens: body.usage?.completion_tokens,
@@ -573,15 +702,15 @@ class GroqProviderAdapter implements ProviderAdapter {
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return {
-          ok: false as const,
-          code: "timeout" as const,
+          ok: false,
+          code: "timeout",
           message: `Groq request timed out after ${timeoutMs}ms.`,
           retryable: false,
         };
       }
       return {
-        ok: false as const,
-        code: "provider_error" as const,
+        ok: false,
+        code: "provider_error",
         message: maskSecrets((error as Error).message, [apiKey]),
         retryable: true,
       };
@@ -592,13 +721,19 @@ class GroqProviderAdapter implements ProviderAdapter {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 3. OpenRouter (OpenAI-compatible, JSON response_format)
+// 4. OpenRouter (Fallback 3 — OpenAI-compatible JSON mode)
 // ──────────────────────────────────────────────────────────────
 
 class OpenRouterProviderAdapter implements ProviderAdapter {
   readonly name = "openrouter" as const;
 
-  async execute<T>(options: AiCallOptions<T>, apiKey: string, model: string, timeoutMs: number) {
+  async execute<T>(
+    options: AiCallOptions<T>,
+    apiKey: string,
+    model: string,
+    timeoutMs: number,
+  ): Promise<ProviderAdapterResult> {
+    assertValidModelId(model);
     const url = process.env["OPENROUTER_BASE_URL"] || OPENROUTER_BASE_URL;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -615,6 +750,7 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
         },
         body: JSON.stringify({
           model,
+          max_tokens: 4000,
           temperature: options.temperature ?? 0,
           response_format: { type: "json_object" },
           messages: [
@@ -629,32 +765,32 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
 
       if (response.status === 429) {
         return {
-          ok: false as const,
-          code: "rate_limited" as const,
+          ok: false,
+          code: "rate_limited",
           message: "OpenRouter rate limit reached.",
           retryable: false,
         };
       }
       if (response.status === 401 || response.status === 403) {
         return {
-          ok: false as const,
-          code: "authentication_failed" as const,
+          ok: false,
+          code: "authentication_failed",
           message: "OpenRouter authentication failed.",
           retryable: false,
         };
       }
       if (response.status === 402) {
         return {
-          ok: false as const,
-          code: "payment_required" as const,
+          ok: false,
+          code: "payment_required",
           message: "OpenRouter credits exhausted.",
           retryable: false,
         };
       }
-      if (response.status === 503) {
+      if (response.status === 503 || response.status === 502) {
         return {
-          ok: false as const,
-          code: "provider_unavailable" as const,
+          ok: false,
+          code: "provider_unavailable",
           message: "OpenRouter service is temporarily unavailable.",
           retryable: true,
         };
@@ -670,11 +806,8 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
           /* ignore */
         }
         return {
-          ok: false as const,
-          code:
-            response.status >= 500
-              ? ("provider_unavailable" as const)
-              : ("provider_error" as const),
+          ok: false,
+          code: response.status >= 500 ? "provider_unavailable" : "provider_error",
           message: errorMsg,
           retryable: response.status >= 500,
         };
@@ -688,7 +821,7 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
       const rawText = body.choices?.[0]?.message?.content ?? "";
 
       return {
-        ok: true as const,
+        ok: true,
         rawText,
         promptTokens: body.usage?.prompt_tokens,
         completionTokens: body.usage?.completion_tokens,
@@ -697,15 +830,15 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return {
-          ok: false as const,
-          code: "timeout" as const,
+          ok: false,
+          code: "timeout",
           message: `OpenRouter request timed out after ${timeoutMs}ms.`,
           retryable: false,
         };
       }
       return {
-        ok: false as const,
-        code: "provider_error" as const,
+        ok: false,
+        code: "provider_error",
         message: maskSecrets((error as Error).message, [apiKey]),
         retryable: true,
       };
@@ -726,50 +859,69 @@ type ProviderConfig = {
 };
 
 /**
- * Codes that signal provider exhaustion — trigger cascade to next provider.
- * Codes like validation_failed / malformed_response are content problems and
- * do NOT cascade to another provider (they retry within the same provider).
+ * Codes that signal transient provider exhaustion and allow cascading to the next provider.
+ * Validation failure, malformed responses, bad requests, or client errors do NOT cascade.
  */
 const CASCADE_CODES = new Set<AiFailureCode>([
   "rate_limited",
   "payment_required",
   "timeout",
   "provider_unavailable",
-  "authentication_failed",
+  "provider_error",
 ]);
 
 /**
- * Build the ordered list of available providers from environment.
- * Provider is excluded if its key is absent or empty.
+ * Build the ordered list of available providers from environment:
+ * 1. Qwen / DashScope (Primary)
+ * 2. Google Gemini (Fallback 1)
+ * 3. Groq (Fallback 2)
+ * 4. OpenRouter (Fallback 3)
  */
 function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
   ensureServerEnv();
   const providers: ProviderConfig[] = [];
 
+  // 1. Qwen / DashScope (Primary)
+  const qwenKey = process.env["DASHSCOPE_API_KEY"];
+  if (qwenKey && qwenKey.trim()) {
+    const pool = getProviderModelPool("qwen", modelOverride?.startsWith("qwen") ? modelOverride : undefined);
+    providers.push({
+      adapter: new QwenProviderAdapter(),
+      apiKey: qwenKey,
+      model: pool[0] ?? DEFAULT_QWEN_MODEL,
+    });
+  }
+
+  // 2. Google Gemini (Fallback 1)
   const geminiKey = process.env["GEMINI_API_KEY"];
-  if (geminiKey) {
+  if (geminiKey && geminiKey.trim()) {
+    const pool = getProviderModelPool("gemini", modelOverride?.startsWith("gemini") ? modelOverride : undefined);
     providers.push({
       adapter: new GeminiProviderAdapter(),
       apiKey: geminiKey,
-      model: modelOverride ?? process.env["GEMINI_MODEL"] ?? DEFAULT_GEMINI_MODEL,
+      model: pool[0] ?? DEFAULT_GEMINI_MODEL,
     });
   }
 
+  // 3. Groq (Fallback 2)
   const groqKey = process.env["GROQ_API_KEY"];
-  if (groqKey) {
+  if (groqKey && groqKey.trim()) {
+    const pool = getProviderModelPool("groq", modelOverride?.includes("gpt-oss") ? modelOverride : undefined);
     providers.push({
       adapter: new GroqProviderAdapter(),
       apiKey: groqKey,
-      model: process.env["GROQ_MODEL"] ?? DEFAULT_GROQ_MODEL,
+      model: pool[0] ?? DEFAULT_GROQ_MODEL,
     });
   }
 
+  // 4. OpenRouter (Fallback 3)
   const openrouterKey = process.env["OPENROUTER_API_KEY"];
-  if (openrouterKey) {
+  if (openrouterKey && openrouterKey.trim()) {
+    const pool = getProviderModelPool("openrouter", modelOverride?.includes("nemotron") ? modelOverride : undefined);
     providers.push({
       adapter: new OpenRouterProviderAdapter(),
       apiKey: openrouterKey,
-      model: process.env["OPENROUTER_MODEL"] ?? DEFAULT_OPENROUTER_MODEL,
+      model: pool[0] ?? DEFAULT_OPENROUTER_MODEL,
     });
   }
 
@@ -781,12 +933,12 @@ function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
 // ──────────────────────────────────────────────────────────────
 
 /**
- * Execute a structured AI call through the provider cascade.
+ * Execute a structured AI call through the centralized provider cascade:
+ * Qwen (Primary) → Gemini (Fallback 1) → Groq (Fallback 2) → OpenRouter (Fallback 3).
  *
- * Tries Gemini → Groq → OpenRouter in order.
- * Cascades to the next provider on rate_limited, payment_required, or timeout.
- * Retries within the same provider on transient 5xx or network errors (bounded backoff).
- * Never cascades on validation_failed or malformed_response — those are content issues.
+ * Cascades to the next provider ONLY on transient infrastructure issues:
+ * rate_limited (429), payment_required (402), timeout, provider_unavailable (503/502), provider_error (500).
+ * Never cascades on schema validation_failed or malformed_response — those are content issues.
  */
 export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<AiResult<T>> {
   const started = Date.now();
@@ -797,8 +949,8 @@ export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<Ai
       ok: false,
       code: "not_configured",
       message:
-        "AI is not configured for this environment. Please set GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
-      usage: emptyUsage(DEFAULT_GEMINI_MODEL, "gemini", started, 0),
+        "AI is not configured for this environment. Please set DASHSCOPE_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
+      usage: emptyUsage(DEFAULT_QWEN_MODEL, "qwen", started, 0),
     };
   }
 
@@ -807,32 +959,41 @@ export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<Ai
 
   let lastCode: AiFailureCode = "provider_error";
   let lastMessage = "AI request failed.";
-  let lastProvider: AiUsage["activeProvider"] = cascade[0]!.adapter.name;
+  let lastProvider: ProviderId = cascade[0]!.adapter.name;
   let lastModel = cascade[0]!.model;
   let totalAttempts = 0;
 
-  for (const { adapter, apiKey, model } of cascade) {
+  for (let i = 0; i < cascade.length; i++) {
+    const currentConfig = cascade[i]!;
+    const { adapter, apiKey, model } = currentConfig;
     lastProvider = adapter.name;
     lastModel = model;
 
     let attempts = 0;
+    let providerSucceeded = false;
 
     while (attempts < maxAttempts) {
       attempts += 1;
       totalAttempts += 1;
 
+      const attemptStart = Date.now();
       const result = await adapter.execute(options, apiKey, model, timeoutMs);
+      const attemptLatency = Date.now() - attemptStart;
 
       if (!result.ok) {
         lastCode = result.code;
         lastMessage = result.message;
 
-        // Cascade codes: skip remaining attempts for this provider, try next
+        console.warn(
+          `[AI] provider=${adapter.name} model=${model} operation=${options.toolName} attempt=${attempts} status=${result.code} latency=${attemptLatency}ms`,
+        );
+
+        // Cascade codes: skip remaining attempts for this provider, cascade to next provider
         if (CASCADE_CODES.has(result.code)) {
           break;
         }
 
-        // Non-retryable provider errors: stop this provider immediately
+        // Non-retryable provider errors (e.g. invalid API key): stop immediately, do not cascade
         if (!result.retryable || attempts >= maxAttempts) {
           break;
         }
@@ -847,6 +1008,9 @@ export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<Ai
       if (payload === undefined) {
         lastCode = "malformed_response";
         lastMessage = "The AI response could not be parsed as structured data.";
+        console.warn(
+          `[AI] provider=${adapter.name} model=${model} operation=${options.toolName} attempt=${attempts} status=malformed_response`,
+        );
         // Retry within the same provider (content issue, not provider issue)
         if (attempts >= maxAttempts) break;
         continue;
@@ -857,13 +1021,21 @@ export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<Ai
         lastCode = "validation_failed";
         lastMessage = `The AI response did not match the expected schema: ${parsed.error.issues
           .slice(0, 3)
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
           .join("; ")}`;
+        console.warn(
+          `[AI] provider=${adapter.name} model=${model} operation=${options.toolName} attempt=${attempts} status=validation_failed reason=${lastMessage}`,
+        );
         // Retry within the same provider (content issue, not provider issue)
         if (attempts >= maxAttempts) break;
         continue;
       }
 
+      console.log(
+        `[AI] provider=${adapter.name} model=${model} operation=${options.toolName} attempt=${attempts} latency=${attemptLatency}ms tokens=${result.totalTokens ?? "n/a"}`,
+      );
+
+      providerSucceeded = true;
       return {
         ok: true,
         data: parsed.data,
@@ -879,8 +1051,18 @@ export async function callStructuredAi<T>(options: AiCallOptions<T>): Promise<Ai
       };
     }
 
-    // Only cascade to the next provider if the failure was a capacity/quota/timeout code
-    if (!CASCADE_CODES.has(lastCode)) {
+    if (providerSucceeded) {
+      break;
+    }
+
+    // If this provider failed with a cascade code, log fallback and proceed to next provider
+    if (CASCADE_CODES.has(lastCode) && i + 1 < cascade.length) {
+      const nextProvider = cascade[i + 1]!.adapter.name;
+      console.warn(
+        `[AI] fallback provider=${nextProvider} previous=${adapter.name} reason=${lastCode}`,
+      );
+    } else if (!CASCADE_CODES.has(lastCode)) {
+      // Hard failure (e.g. validation_failed, authentication_failed) — do NOT cascade
       break;
     }
   }

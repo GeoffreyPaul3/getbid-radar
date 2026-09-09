@@ -258,7 +258,7 @@ async function recordUsage(
     units: args.usage.totalTokens ?? 0,
     resource_id: args.resourceId,
     metadata: {
-      provider: args.usage.activeProvider ?? "gemini",
+      provider: args.usage.activeProvider ?? "qwen",
       model: args.usage.model,
       input_tokens: args.usage.promptTokens ?? null,
       output_tokens: args.usage.completionTokens ?? null,

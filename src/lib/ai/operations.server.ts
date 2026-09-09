@@ -160,6 +160,13 @@ VERDICTS
 
 RULES
 - Use ONLY the supplied evidence. Never assume, infer or invent projects, certifications, staff, turnover, equipment, registrations, geographic presence or past contracts.
+- EVIDENCE QUALITY & INDIVIDUAL VS CORPORATE SEMANTICS:
+  - Company-level evidence must NEVER be conflated with individual-level requirements.
+  - A company's country, location, or headquarters does NOT satisfy personal individual citizenship, nationality, or personal residency requirements (e.g. World Bank member country residency).
+  - A company's employee headcount does NOT satisfy personal individual age eligibility.
+  - Company service capabilities do NOT satisfy individual professional certifications unless a specific named team member's profile explicitly documents it.
+  - Company corporate registration does NOT satisfy personal individual registration or personal background checks.
+  - If an individual-level requirement lacks specific individual/team evidence, it MUST be marked "unknown" with "Evidence not found." and low confidence, NEVER "match".
 - Cite the evidence you used through evidence_ids, using the ids exactly as supplied.
 - Structured company records are authoritative. If a knowledge-base excerpt contradicts a structured record, prefer the structured record and state the contradiction in reasoning.
 - If evidence conflicts, surface the conflict instead of choosing the favourable reading.
