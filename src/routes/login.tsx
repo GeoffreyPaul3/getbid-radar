@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldCheck, Radar, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import logo from "@/assets/bidradar.png"
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -112,12 +113,7 @@ function LoginPage() {
 
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground font-mono font-bold text-lg shadow-sm">
-            BR
-          </div>
-          <span className="font-display font-bold tracking-tight text-xl text-white">
-            GetBid<span className="text-accent">Radar</span>
-          </span>
+          <img src={logo} width={140} height={110} alt="BidRadar" />
         </div>
 
         {/* Value Proposition */}
