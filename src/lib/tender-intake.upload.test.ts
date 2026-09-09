@@ -53,10 +53,7 @@ vi.mock("@/lib/analysis/pipeline.server", () => ({
 }));
 
 import { ingestTenderFromUpload } from "@/lib/tender-intake.server";
-import {
-  canAnalyzeTender,
-  recordAnalysisUsage,
-} from "@/lib/billing/entitlements.server";
+import { canAnalyzeTender, recordAnalysisUsage } from "@/lib/billing/entitlements.server";
 import { extractDocument } from "@/lib/extract.server";
 import { runOpportunityAnalysis } from "@/lib/analysis/pipeline.server";
 
@@ -68,11 +65,13 @@ import { runOpportunityAnalysis } from "@/lib/analysis/pipeline.server";
 type Row = Record<string, unknown>;
 type Tables = Record<string, Row[]>;
 
-function makeStorageStub(opts: {
-  downloadOk?: boolean;
-  downloadError?: string;
-  fileBytes?: Uint8Array;
-} = {}): { storageFake: unknown; storageObjects: Map<string, Uint8Array> } {
+function makeStorageStub(
+  opts: {
+    downloadOk?: boolean;
+    downloadError?: string;
+    fileBytes?: Uint8Array;
+  } = {},
+): { storageFake: unknown; storageObjects: Map<string, Uint8Array> } {
   const storageObjects = new Map<string, Uint8Array>();
 
   const storageFake = {
@@ -108,9 +107,17 @@ function makeClient(opts: FakeDbOptions = {}): {
     const failKey = opts.failOn?.[table];
     return {
       insert: (payload: Row | Row[]) => {
-        if (failKey) return { then: (r: (v: { data: null; error: { message: string } }) => unknown) => r({ data: null, error: { message: failKey } }) };
+        if (failKey)
+          return {
+            then: (r: (v: { data: null; error: { message: string } }) => unknown) =>
+              r({ data: null, error: { message: failKey } }),
+          };
         const rows = Array.isArray(payload) ? payload : [payload];
-        const created = rows.map((r) => ({ id: `fake-${table}-${Date.now()}`, created_at: new Date().toISOString(), ...r }));
+        const created = rows.map((r) => ({
+          id: `fake-${table}-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          ...r,
+        }));
         (tables[table] ??= []).push(...created);
         return {
           select: () => ({
@@ -153,9 +160,11 @@ describe("ingestTenderFromUpload – upload path regression", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset billing mock to default: allowed
-    vi.mocked(canAnalyzeTender).mockResolvedValue(
-      { allowed: true, reason: undefined, context: {} } as unknown as Awaited<ReturnType<typeof canAnalyzeTender>>,
-    );
+    vi.mocked(canAnalyzeTender).mockResolvedValue({
+      allowed: true,
+      reason: undefined,
+      context: {},
+    } as unknown as Awaited<ReturnType<typeof canAnalyzeTender>>);
     vi.mocked(extractDocument).mockResolvedValue({
       ok: true,
       text: "Sample tender content. ".repeat(20),
@@ -173,7 +182,10 @@ describe("ingestTenderFromUpload – upload path regression", () => {
   });
 
   it("throws when storage bucket is missing (Bucket not found)", async () => {
-    const { storageFake } = makeStorageStub({ downloadOk: false, downloadError: "Bucket not found" });
+    const { storageFake } = makeStorageStub({
+      downloadOk: false,
+      downloadError: "Bucket not found",
+    });
     const { client } = makeClient({ storageFake });
 
     await expect(
@@ -212,15 +224,19 @@ describe("ingestTenderFromUpload – upload path regression", () => {
 
     // The function returns a result (not throws) with analysisError populated
     expect(result.opportunityId).toBeDefined();
-    expect((result as { analysisError?: string }).analysisError).toContain("AI provider unavailable");
+    expect((result as { analysisError?: string }).analysisError).toContain(
+      "AI provider unavailable",
+    );
     // Opportunity must still exist — it is recoverable
     expect(tables["opportunities"]?.length).toBe(1);
   });
 
   it("throws when billing entitlement is denied", async () => {
-    vi.mocked(canAnalyzeTender).mockResolvedValue(
-      { allowed: false, reason: "Monthly limit reached", context: {} } as unknown as Awaited<ReturnType<typeof canAnalyzeTender>>,
-    );
+    vi.mocked(canAnalyzeTender).mockResolvedValue({
+      allowed: false,
+      reason: "Monthly limit reached",
+      context: {},
+    } as unknown as Awaited<ReturnType<typeof canAnalyzeTender>>);
 
     const { storageFake } = makeStorageStub({ downloadOk: true });
     const { client, tables } = makeClient({ storageFake });
@@ -235,9 +251,11 @@ describe("ingestTenderFromUpload – upload path regression", () => {
   });
 
   it("propagates extraction failure cleanly for an unreadable file", async () => {
-    vi.mocked(extractDocument).mockResolvedValue(
-      { ok: false, text: "", reason: "Unsupported file format" } as Awaited<ReturnType<typeof extractDocument>>,
-    );
+    vi.mocked(extractDocument).mockResolvedValue({
+      ok: false,
+      text: "",
+      reason: "Unsupported file format",
+    } as Awaited<ReturnType<typeof extractDocument>>);
 
     const { storageFake } = makeStorageStub({ downloadOk: true });
     const { client } = makeClient({ storageFake });

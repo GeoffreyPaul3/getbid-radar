@@ -38,12 +38,8 @@ describe("Provider Registry & Capability Matrix", () => {
   it("strictly rejects forbidden / decommissioned model IDs", () => {
     expect(FORBIDDEN_MODEL_IDS.has("llama-3.3-70b-versatile")).toBe(true);
 
-    expect(() => assertValidModelId("llama-3.3-70b-versatile")).toThrow(
-      /Prohibited model ID/i,
-    );
-    expect(() => assertValidModelId("LLAMA-3.3-70B-VERSATILE")).toThrow(
-      /Prohibited model ID/i,
-    );
+    expect(() => assertValidModelId("llama-3.3-70b-versatile")).toThrow(/Prohibited model ID/i);
+    expect(() => assertValidModelId("LLAMA-3.3-70B-VERSATILE")).toThrow(/Prohibited model ID/i);
 
     // Valid models should not throw
     expect(() => assertValidModelId(DEFAULT_QWEN_MODEL)).not.toThrow();

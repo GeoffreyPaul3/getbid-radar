@@ -884,7 +884,10 @@ function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
   // 1. Qwen / DashScope (Primary)
   const qwenKey = process.env["DASHSCOPE_API_KEY"];
   if (qwenKey && qwenKey.trim()) {
-    const pool = getProviderModelPool("qwen", modelOverride?.startsWith("qwen") ? modelOverride : undefined);
+    const pool = getProviderModelPool(
+      "qwen",
+      modelOverride?.startsWith("qwen") ? modelOverride : undefined,
+    );
     providers.push({
       adapter: new QwenProviderAdapter(),
       apiKey: qwenKey,
@@ -895,7 +898,10 @@ function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
   // 2. Google Gemini (Fallback 1)
   const geminiKey = process.env["GEMINI_API_KEY"];
   if (geminiKey && geminiKey.trim()) {
-    const pool = getProviderModelPool("gemini", modelOverride?.startsWith("gemini") ? modelOverride : undefined);
+    const pool = getProviderModelPool(
+      "gemini",
+      modelOverride?.startsWith("gemini") ? modelOverride : undefined,
+    );
     providers.push({
       adapter: new GeminiProviderAdapter(),
       apiKey: geminiKey,
@@ -906,7 +912,10 @@ function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
   // 3. Groq (Fallback 2)
   const groqKey = process.env["GROQ_API_KEY"];
   if (groqKey && groqKey.trim()) {
-    const pool = getProviderModelPool("groq", modelOverride?.includes("gpt-oss") ? modelOverride : undefined);
+    const pool = getProviderModelPool(
+      "groq",
+      modelOverride?.includes("gpt-oss") ? modelOverride : undefined,
+    );
     providers.push({
       adapter: new GroqProviderAdapter(),
       apiKey: groqKey,
@@ -917,7 +926,10 @@ function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
   // 4. OpenRouter (Fallback 3)
   const openrouterKey = process.env["OPENROUTER_API_KEY"];
   if (openrouterKey && openrouterKey.trim()) {
-    const pool = getProviderModelPool("openrouter", modelOverride?.includes("nemotron") ? modelOverride : undefined);
+    const pool = getProviderModelPool(
+      "openrouter",
+      modelOverride?.includes("nemotron") ? modelOverride : undefined,
+    );
     providers.push({
       adapter: new OpenRouterProviderAdapter(),
       apiKey: openrouterKey,

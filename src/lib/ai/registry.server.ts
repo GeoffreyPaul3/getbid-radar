@@ -11,10 +11,7 @@ import { ensureServerEnv } from "../server-env";
 
 export type ProviderId = "qwen" | "gemini" | "groq" | "openrouter";
 
-export type AiOperation =
-  | "requirement_extraction"
-  | "requirement_matching"
-  | "bid_assessment";
+export type AiOperation = "requirement_extraction" | "requirement_matching" | "bid_assessment";
 
 export interface ProviderCapability {
   readonly provider: ProviderId;
@@ -66,11 +63,7 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     priority: 1,
     defaultModel: DEFAULT_QWEN_MODEL,
     fallbackModels: DEFAULT_QWEN_MODELS,
-    supportedOperations: [
-      "requirement_extraction",
-      "requirement_matching",
-      "bid_assessment",
-    ],
+    supportedOperations: ["requirement_extraction", "requirement_matching", "bid_assessment"],
     supportsStructuredOutput: true,
     baseUrl: QWEN_BASE_URL,
     envKeyName: "DASHSCOPE_API_KEY",
@@ -80,11 +73,7 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     priority: 2,
     defaultModel: DEFAULT_GEMINI_MODEL,
     fallbackModels: DEFAULT_GEMINI_MODELS,
-    supportedOperations: [
-      "requirement_extraction",
-      "requirement_matching",
-      "bid_assessment",
-    ],
+    supportedOperations: ["requirement_extraction", "requirement_matching", "bid_assessment"],
     supportsStructuredOutput: true,
     baseUrl: GEMINI_BASE_URL,
     envKeyName: "GEMINI_API_KEY",
@@ -94,11 +83,7 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     priority: 3,
     defaultModel: DEFAULT_GROQ_MODEL,
     fallbackModels: DEFAULT_GROQ_MODELS,
-    supportedOperations: [
-      "requirement_extraction",
-      "requirement_matching",
-      "bid_assessment",
-    ],
+    supportedOperations: ["requirement_extraction", "requirement_matching", "bid_assessment"],
     supportsStructuredOutput: true,
     baseUrl: GROQ_BASE_URL,
     envKeyName: "GROQ_API_KEY",
@@ -108,11 +93,7 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     priority: 4,
     defaultModel: DEFAULT_OPENROUTER_MODEL,
     fallbackModels: DEFAULT_OPENROUTER_MODELS,
-    supportedOperations: [
-      "requirement_extraction",
-      "requirement_matching",
-      "bid_assessment",
-    ],
+    supportedOperations: ["requirement_extraction", "requirement_matching", "bid_assessment"],
     supportsStructuredOutput: true,
     baseUrl: OPENROUTER_BASE_URL,
     envKeyName: "OPENROUTER_API_KEY",
@@ -146,12 +127,17 @@ export function getProviderModelPool(provider: ProviderId, preferredModel?: stri
   switch (provider) {
     case "qwen": {
       const envModel = process.env["DASHSCOPE_MODEL"] || process.env["QWEN_MODEL"];
-      pool = envModel ? [envModel, ...DEFAULT_QWEN_MODELS.filter((m) => m !== envModel)] : [...DEFAULT_QWEN_MODELS];
+      pool = envModel
+        ? [envModel, ...DEFAULT_QWEN_MODELS.filter((m) => m !== envModel)]
+        : [...DEFAULT_QWEN_MODELS];
       break;
     }
     case "gemini": {
       const envModels = process.env["GEMINI_MODELS"]
-        ? process.env["GEMINI_MODELS"].split(",").map((s) => s.trim()).filter(Boolean)
+        ? process.env["GEMINI_MODELS"]
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
         : [];
       const envModel = process.env["GEMINI_MODEL"];
       const basePool = envModels.length > 0 ? envModels : [...DEFAULT_GEMINI_MODELS];
@@ -160,12 +146,16 @@ export function getProviderModelPool(provider: ProviderId, preferredModel?: stri
     }
     case "groq": {
       const envModel = process.env["GROQ_MODEL"];
-      pool = envModel ? [envModel, ...DEFAULT_GROQ_MODELS.filter((m) => m !== envModel)] : [...DEFAULT_GROQ_MODELS];
+      pool = envModel
+        ? [envModel, ...DEFAULT_GROQ_MODELS.filter((m) => m !== envModel)]
+        : [...DEFAULT_GROQ_MODELS];
       break;
     }
     case "openrouter": {
       const envModel = process.env["OPENROUTER_MODEL"];
-      pool = envModel ? [envModel, ...DEFAULT_OPENROUTER_MODELS.filter((m) => m !== envModel)] : [...DEFAULT_OPENROUTER_MODELS];
+      pool = envModel
+        ? [envModel, ...DEFAULT_OPENROUTER_MODELS.filter((m) => m !== envModel)]
+        : [...DEFAULT_OPENROUTER_MODELS];
       break;
     }
   }

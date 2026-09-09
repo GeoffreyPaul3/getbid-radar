@@ -21,7 +21,7 @@ ensureServerEnv();
 
 const hasAiKey = Boolean(
   (process.env["DASHSCOPE_API_KEY"] && process.env["DASHSCOPE_API_KEY"].length > 5) ||
-    (process.env["GEMINI_API_KEY"] && process.env["GEMINI_API_KEY"].length > 5),
+  (process.env["GEMINI_API_KEY"] && process.env["GEMINI_API_KEY"].length > 5),
 );
 
 describe.runIf(hasAiKey)("Real Tender URLs Live End-to-End Analysis", () => {
@@ -68,7 +68,8 @@ describe.runIf(hasAiKey)("Real Tender URLs Live End-to-End Analysis", () => {
         legal_name: "Nuerex Labs Limited",
         country: "Malawi",
         tagline: "Artificial intelligence, software innovation, and data solutions",
-        description: "AI software and machine learning engineering laboratory based in Lilongwe, Malawi.",
+        description:
+          "AI software and machine learning engineering laboratory based in Lilongwe, Malawi.",
       },
     ];
     db.tables["company_capabilities"] = [
@@ -145,7 +146,9 @@ describe.runIf(hasAiKey)("Real Tender URLs Live End-to-End Analysis", () => {
       // Search for any citizenship or residency requirement
       const residencyReq = reqs.find((r) => {
         const text = `${r["title"]} ${r["description"]}`.toLowerCase();
-        return text.includes("residenc") || text.includes("citizen") || text.includes("member country");
+        return (
+          text.includes("residenc") || text.includes("citizen") || text.includes("member country")
+        );
       });
 
       if (residencyReq) {

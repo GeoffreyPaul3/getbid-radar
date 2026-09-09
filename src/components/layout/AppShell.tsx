@@ -119,7 +119,7 @@ export function AppShell({ children }: AppShellProps) {
             {!isCollapsed ? (
               <>
                 <Link to="/dashboard" className="flex items-center gap-2 group overflow-hidden">
-                  <img src={logo} width={160} height={130} alt="BidRadar" />
+                  <img src={logo} width={140} height={110} alt="BidRadar" />
                 </Link>
                 <Button
                   variant="ghost"

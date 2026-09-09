@@ -43,7 +43,12 @@ export const Route = createFileRoute("/billing/confirm")({
 
 function BillingConfirmPage() {
   const { tx_ref: txRef } = Route.useSearch();
-  const { workspace, allWorkspaces, isLoading: workspaceLoading, refetchWorkspace } = useWorkspace();
+  const {
+    workspace,
+    allWorkspaces,
+    isLoading: workspaceLoading,
+    refetchWorkspace,
+  } = useWorkspace();
   const navigate = useNavigate();
 
   const [verifying, setVerifying] = useState(true);
@@ -87,8 +92,7 @@ function BillingConfirmPage() {
       setError(null);
 
       // Find the workspace matching txRef prefix if multiple exist
-      const targetWs =
-        allWorkspaces.find((w) => txRef.includes(w.id.substring(0, 8))) || workspace;
+      const targetWs = allWorkspaces.find((w) => txRef.includes(w.id.substring(0, 8))) || workspace;
 
       try {
         const res = await verifyPaymentFn({
@@ -209,7 +213,10 @@ function BillingConfirmPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground font-sans">Amount Paid:</span>
                     <span className="font-bold text-foreground">
-                      {formatBillingAmount(Number(result.amount), (result.currency as BillingCurrency) || "MWK")}
+                      {formatBillingAmount(
+                        Number(result.amount),
+                        (result.currency as BillingCurrency) || "MWK",
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
