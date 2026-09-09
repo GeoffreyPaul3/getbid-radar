@@ -35,8 +35,10 @@ import {
   ShieldAlert,
   ListTodo,
   FileBarChart,
+  Award,
 } from "lucide-react";
 import { analyzeOpportunity, getAnalysis } from "@/lib/analysis/analysis.functions";
+import { normalizeRisks, safeTextList } from "@/lib/analysis/risk-normalization";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -235,12 +237,12 @@ function IntelligenceReportPage() {
   const hasAnalysis = isCompleted;
   const rec = analysis?.recommendation?.toLowerCase();
   const humanOverride = analysis?.human_override?.toLowerCase();
-  const blockers = (analysis?.critical_blockers as string[]) || [];
-  const strengths = (analysis?.strengths as string[]) || [];
-  const risks = (analysis?.risks as string[]) || [];
-  const missingEvidence = (analysis?.missing_evidence as string[]) || [];
-  const openQuestions = (analysis?.open_questions as string[]) || [];
-  const requiredActions = (analysis?.required_actions as string[]) || [];
+  const blockers = safeTextList(analysis?.critical_blockers);
+  const strengths = safeTextList(analysis?.strengths);
+  const risks = normalizeRisks(analysis?.risks);
+  const missingEvidence = safeTextList(analysis?.missing_evidence);
+  const openQuestions = safeTextList(analysis?.open_questions);
+  const requiredActions = safeTextList(analysis?.required_actions);
 
   return (
     <AppShell>
@@ -668,7 +670,7 @@ function IntelligenceReportPage() {
               <Card className="border border-border/80 shadow-panel bg-card">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2 text-foreground font-display font-bold text-base">
-                    <Sparkles className="h-4 w-4 text-accent" /> Executive Qualification Summary
+                    <Award className="h-4 w-4 text-accent" /> Executive Qualification Summary
                   </div>
                   <CardDescription className="text-xs">
                     Synthesized qualification rationale, key competitive factors, and risk posture.
@@ -849,15 +851,49 @@ function IntelligenceReportPage() {
                       No significant risks flagged.
                     </p>
                   ) : (
-                    risks.map((r, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg border border-border/60 bg-surface/40 text-xs leading-relaxed flex items-start gap-2"
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-review mt-1.5 shrink-0" />
-                        <span>{r}</span>
-                      </div>
-                    ))
+                    risks.map((risk, idx) => {
+                      const isHigh = risk.severity === "high";
+                      const isLow = risk.severity === "low";
+                      const dotClass = isHigh
+                        ? "bg-destructive"
+                        : isLow
+                          ? "bg-muted-foreground"
+                          : "bg-review";
+                      const badgeClass = isHigh
+                        ? "bg-destructive/15 text-destructive border-destructive/30"
+                        : isLow
+                          ? "bg-muted text-muted-foreground border-border/60"
+                          : "bg-review/15 text-review border-review/30";
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-lg border border-border/60 bg-surface/40 text-xs leading-relaxed space-y-1.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 min-w-0">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${dotClass} mt-1.5 shrink-0`}
+                              />
+                              <span className="font-semibold text-foreground break-words">
+                                {risk.title}
+                              </span>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] uppercase font-mono tracking-wider px-1.5 py-0 shrink-0 font-semibold ${badgeClass}`}
+                            >
+                              {risk.severity}
+                            </Badge>
+                          </div>
+                          {risk.detail && (
+                            <p className="text-muted-foreground pl-3.5 text-[11px] leading-relaxed">
+                              {risk.detail}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </CardContent>
               </Card>
