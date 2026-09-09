@@ -79,7 +79,9 @@ export const getBillingHistoryFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: transactions, error } = await context.supabase
       .from("billing_transactions")
-      .select("id, tx_ref, plan, currency, amount, status, provider_status, activated_at, created_at")
+      .select(
+        "id, tx_ref, plan, currency, amount, status, provider_status, activated_at, created_at",
+      )
       .eq("workspace_id", data.workspaceId)
       .order("created_at", { ascending: false })
       .limit(20);

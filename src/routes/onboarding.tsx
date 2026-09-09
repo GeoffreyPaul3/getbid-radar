@@ -73,8 +73,10 @@ function OnboardingPage() {
       setWebsite(companyProfile.website || "");
       setEmployeeCount(companyProfile.employee_count ?? "");
       setYearsInOperation(companyProfile.years_in_operation ?? "");
-      const minVal = companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
-      const maxVal = companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
+      const minVal =
+        companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
+      const maxVal =
+        companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
       setMinContractValue(minVal);
       setMaxContractValue(maxVal);
       setMinContractDisplay(minVal === "" ? "" : Number(minVal).toLocaleString());

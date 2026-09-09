@@ -1,14 +1,36 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, ArrowRight, CreditCard, RefreshCw, Clock } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  ArrowRight,
+  CreditCard,
+  RefreshCw,
+  Clock,
+} from "lucide-react";
 import { verifyPaymentFn } from "@/lib/billing/billing.functions";
-import { formatBillingAmount, type BillingCurrency, getPlanConfig, type PlanTier } from "@/lib/billing/plans";
+import {
+  formatBillingAmount,
+  type BillingCurrency,
+  getPlanConfig,
+  type PlanTier,
+  type VerifyPaymentResult,
+} from "@/lib/billing/plans";
 
 const searchSchema = z.object({
   tx_ref: z.string().optional(),
@@ -25,10 +47,10 @@ function BillingConfirmPage() {
   const navigate = useNavigate();
 
   const [verifying, setVerifying] = useState(true);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<VerifyPaymentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function performVerification() {
+  const performVerification = useCallback(async () => {
     if (!workspace || !txRef) {
       setVerifying(false);
       return;
@@ -45,7 +67,7 @@ function BillingConfirmPage() {
         },
       });
 
-      setResult(res);
+      setResult(res as VerifyPaymentResult);
       if (res.status === "successful") {
         await refetchWorkspace();
       }
@@ -55,11 +77,11 @@ function BillingConfirmPage() {
     } finally {
       setVerifying(false);
     }
-  }
+  }, [workspace, txRef, refetchWorkspace]);
 
   useEffect(() => {
     performVerification();
-  }, [workspace, txRef]);
+  }, [performVerification]);
 
   return (
     <AppShell>
@@ -86,23 +108,26 @@ function BillingConfirmPage() {
                 <CardTitle className="font-display text-xl text-foreground">
                   Verification Incomplete
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  {error}
-                </CardDescription>
+                <CardDescription className="text-xs">{error}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-4 text-center">
                 <p className="text-xs text-muted-foreground">
-                  Your workspace has not been billed or activated. If your account was charged, please keep your transaction reference (<span className="font-mono text-foreground font-bold">{txRef || "N/A"}</span>) and contact support.
+                  Your workspace has not been billed or activated. If your account was charged,
+                  please keep your transaction reference (
+                  <span className="font-mono text-foreground font-bold">{txRef || "N/A"}</span>) and
+                  contact support.
                 </p>
               </CardContent>
               <CardFooter className="flex justify-center gap-3 pt-2">
                 <Button asChild variant="outline" size="sm" className="text-xs">
-                  <Link to="/billing">
-                    Return to Billing
-                  </Link>
+                  <Link to="/billing">Return to Billing</Link>
                 </Button>
                 {txRef && (
-                  <Button size="sm" onClick={performVerification} className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold">
+                  <Button
+                    size="sm"
+                    onClick={performVerification}
+                    className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold"
+                  >
                     <RefreshCw className="h-3.5 w-3.5" /> Retry Verification
                   </Button>
                 )}
@@ -159,7 +184,10 @@ function BillingConfirmPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground font-sans">Status:</span>
-                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-[10px] uppercase font-bold">
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-[10px] uppercase font-bold"
+                    >
                       Confirmed
                     </Badge>
                   </div>
@@ -171,15 +199,16 @@ function BillingConfirmPage() {
               </CardContent>
 
               <CardFooter className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Button asChild className="w-full sm:w-auto bg-accent text-accent-foreground font-semibold hover:bg-accent/90 shadow-sm text-xs gap-1.5">
+                <Button
+                  asChild
+                  className="w-full sm:w-auto bg-accent text-accent-foreground font-semibold hover:bg-accent/90 shadow-sm text-xs gap-1.5"
+                >
                   <Link to="/dashboard">
                     Go to Executive Dashboard <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full sm:w-auto text-xs">
-                  <Link to="/tenders/new">
-                    Qualify a New Tender
-                  </Link>
+                  <Link to="/tenders/new">Qualify a New Tender</Link>
                 </Button>
               </CardFooter>
             </div>
@@ -193,22 +222,26 @@ function BillingConfirmPage() {
                   Payment Processing
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {result?.message || "The payment gateway is still completing transaction authorization."}
+                  {result?.message ||
+                    "The payment gateway is still completing transaction authorization."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-4 text-center">
                 <p className="text-xs text-muted-foreground">
-                  If you just finished authorizing your mobile money or card prompt, click Check Status to re-query the gateway.
+                  If you just finished authorizing your mobile money or card prompt, click Check
+                  Status to re-query the gateway.
                 </p>
               </CardContent>
               <CardFooter className="flex justify-center gap-3 pt-2">
-                <Button size="sm" onClick={performVerification} className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold">
+                <Button
+                  size="sm"
+                  onClick={performVerification}
+                  className="text-xs gap-1.5 bg-accent text-accent-foreground font-semibold"
+                >
                   <RefreshCw className="h-3.5 w-3.5" /> Check Status Again
                 </Button>
                 <Button asChild variant="outline" size="sm" className="text-xs">
-                  <Link to="/billing">
-                    Back to Billing
-                  </Link>
+                  <Link to="/billing">Back to Billing</Link>
                 </Button>
               </CardFooter>
             </div>

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
+import { useAuth } from "@/lib/auth-context";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,21 +11,63 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, Shield, Sparkles, Loader2, Save, Gauge, CreditCard, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Building2,
+  Users,
+  Shield,
+  Sparkles,
+  Loader2,
+  Save,
+  Gauge,
+  CreditCard,
+  ArrowUpRight,
+  CheckCircle2,
+  UserPlus,
+  Mail,
+  Trash2,
+  Cpu,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import type { Database } from "@/integrations/supabase/types";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/lib/profile-utils";
-import { PLAN_CONFIGS, formatBillingAmount } from "@/lib/billing/plans";
+import {
+  PLAN_CONFIGS,
+  formatBillingAmount,
+  type WorkspaceBillingContext,
+} from "@/lib/billing/plans";
 import { getWorkspaceBillingFn } from "@/lib/billing/billing.functions";
-
-type WorkspaceMember = Database["public"]["Tables"]["workspace_members"]["Row"];
+import {
+  getWorkspaceMembersFn,
+  inviteWorkspaceMemberFn,
+  updateMemberRoleFn,
+  removeMemberFn,
+  revokeInvitationFn,
+} from "@/lib/members/members.functions";
+import type { WorkspaceMemberRecord, AppRole } from "@/lib/members/members.server";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  const { user } = useAuth();
   const { workspace, companyProfile, role, completenessScore, refetchWorkspace } = useWorkspace();
   const [activeTab, setActiveTab] = useState("company");
   const [isSaving, setIsSaving] = useState(false);
@@ -47,53 +90,100 @@ function SettingsPage() {
   const [description, setDescription] = useState("");
 
   // Team State
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [members, setMembers] = useState<WorkspaceMemberRecord[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [billingContext, setBillingContext] = useState<any>(null);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState<AppRole>("member");
+  const [isInviting, setIsInviting] = useState(false);
+  const [billingContext, setBillingContext] = useState<WorkspaceBillingContext | null>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
 
-  useEffect(() => {
-    if (companyProfile) {
-      setCompanyName(companyProfile.company_name || "");
-      setLegalName(companyProfile.legal_name || "");
-      setIndustry(companyProfile.industry || "");
-      setCountry(companyProfile.country || "");
-      setWebsite(companyProfile.website || "");
-      setEmployeeCount(companyProfile.employee_count ?? "");
-      setYearsInOperation(companyProfile.years_in_operation ?? "");
-      const minVal = companyProfile.min_contract_value != null ? Number(companyProfile.min_contract_value) : "";
-      const maxVal = companyProfile.max_contract_value != null ? Number(companyProfile.max_contract_value) : "";
-      setMinContractValue(minVal);
-      setMaxContractValue(maxVal);
-      setMinContractDisplay(minVal === "" ? "" : Number(minVal).toLocaleString());
-      setMaxContractDisplay(maxVal === "" ? "" : Number(maxVal).toLocaleString());
-      setCurrency(companyProfile.currency || "USD");
-      setPreferredIndustries((companyProfile.preferred_industries || []).join(", "));
-      setPreferredRegions((companyProfile.preferred_regions || []).join(", "));
-      setDescription(companyProfile.description || "");
-    }
-  }, [companyProfile]);
+  const canManageMembers = role === "owner" || role === "admin";
 
-  useEffect(() => {
-    async function loadMembers() {
-      if (!workspace) return;
-      setLoadingMembers(true);
-      try {
-        const { data, error } = await supabase
-          .from("workspace_members")
-          .select("*")
-          .eq("workspace_id", workspace.id);
-        if (error) throw error;
-        setMembers(data ?? []);
-      } catch (err) {
-        console.error("[Settings] Members load error:", err);
-      } finally {
-        setLoadingMembers(false);
-      }
+  const loadMembers = useCallback(async () => {
+    if (!workspace) return;
+    setLoadingMembers(true);
+    try {
+      const data = await getWorkspaceMembersFn({ data: { workspaceId: workspace.id } });
+      setMembers(data);
+    } catch (err) {
+      console.error("[Settings] Members load error:", err);
+    } finally {
+      setLoadingMembers(false);
     }
-
-    loadMembers();
   }, [workspace]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workspace || !newMemberEmail.trim()) return;
+    setIsInviting(true);
+    try {
+      const res = await inviteWorkspaceMemberFn({
+        data: {
+          workspaceId: workspace.id,
+          email: newMemberEmail.trim(),
+          fullName: newMemberName.trim(),
+          role: newMemberRole,
+        },
+      });
+      toast.success(res.message);
+      setAddMemberOpen(false);
+      setNewMemberEmail("");
+      setNewMemberName("");
+      setNewMemberRole("member");
+      await loadMembers();
+    } catch (err) {
+      toast.error("Failed to invite member", { description: (err as Error).message });
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleUpdateRole = async (targetMemberId: string, newRole: AppRole) => {
+    if (!workspace) return;
+    try {
+      const res = await updateMemberRoleFn({
+        data: { workspaceId: workspace.id, targetMemberId, newRole },
+      });
+      toast.success(res.message);
+      await loadMembers();
+    } catch (err) {
+      toast.error("Failed to update role", { description: (err as Error).message });
+    }
+  };
+
+  const handleRemoveMember = async (targetMemberId: string) => {
+    if (!workspace) return;
+    if (!window.confirm("Are you sure you want to remove this member from the workspace?")) return;
+    try {
+      const res = await removeMemberFn({
+        data: { workspaceId: workspace.id, targetMemberId },
+      });
+      toast.success(res.message);
+      await loadMembers();
+    } catch (err) {
+      toast.error("Failed to remove member", { description: (err as Error).message });
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    if (!workspace) return;
+    try {
+      const res = await revokeInvitationFn({
+        data: { workspaceId: workspace.id, invitationId },
+      });
+      toast.success(res.message);
+      await loadMembers();
+    } catch (err) {
+      toast.error("Failed to revoke invitation", { description: (err as Error).message });
+    }
+  };
 
   useEffect(() => {
     async function loadBilling() {
@@ -434,46 +524,323 @@ function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Workspace Members & Directory */}
             <Card className="border border-border/80 shadow-panel bg-card">
-              <CardHeader>
-                <CardTitle className="font-display text-lg">Workspace Members</CardTitle>
-                <CardDescription className="text-xs">
-                  Users with authorized access to this organization&apos;s tenders and evidence.
-                </CardDescription>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="font-display text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5 text-accent" /> Workspace Members & Access Control
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Collaborative team access with strict role-based authorization and tenant
+                    isolation.
+                  </CardDescription>
+                </div>
+                {canManageMembers && (
+                  <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 gap-1.5 shadow-sm"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> Add Member
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[480px]">
+                      <form onSubmit={handleInviteMember}>
+                        <DialogHeader>
+                          <DialogTitle className="font-display text-lg flex items-center gap-2">
+                            <Mail className="h-5 w-5 text-accent" /> Invite Team Member
+                          </DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Send a secure invitation. New members establish their own credentials
+                            upon joining.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="mem-name" className="text-xs">
+                              Full Name
+                            </Label>
+                            <Input
+                              id="mem-name"
+                              placeholder="e.g. Tendai Chisale"
+                              value={newMemberName}
+                              onChange={(e) => setNewMemberName(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="mem-email" className="text-xs">
+                              Business Email
+                            </Label>
+                            <Input
+                              id="mem-email"
+                              type="email"
+                              placeholder="colleague@organization.com"
+                              value={newMemberEmail}
+                              onChange={(e) => setNewMemberEmail(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="mem-role" className="text-xs">
+                              Workspace Role
+                            </Label>
+                            <Select
+                              value={newMemberRole}
+                              onValueChange={(val) => setNewMemberRole(val as AppRole)}
+                            >
+                              <SelectTrigger id="mem-role" className="h-9 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">
+                                  Admin (Full management & invitations)
+                                </SelectItem>
+                                <SelectItem value="member">
+                                  Member (Analyze tenders, edit tasks & proposals)
+                                </SelectItem>
+                                <SelectItem value="viewer">
+                                  Viewer (Read-only intelligence access)
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="p-3 rounded-lg border border-border/60 bg-muted/30 text-[11px] text-muted-foreground leading-relaxed">
+                            <span className="font-semibold text-foreground">
+                              Zero-Trust Credential Setup:
+                            </span>{" "}
+                            Passwords are never generated or transmitted in plaintext. The invited
+                            user will receive a secure onboarding link to establish their own
+                            credentials.
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAddMemberOpen(false)}
+                            disabled={isInviting}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            disabled={isInviting}
+                            className="bg-accent text-accent-foreground font-semibold"
+                          >
+                            {isInviting ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                            ) : (
+                              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            Send Invitation
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </CardHeader>
-              <CardContent className="pt-0 space-y-2">
+              <CardContent className="pt-0 space-y-3">
                 {loadingMembers ? (
-                  <div className="flex items-center justify-center p-6">
+                  <div className="flex items-center justify-center p-8">
                     <Loader2 className="h-6 w-6 animate-spin text-accent" />
                   </div>
+                ) : members.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No members found in this workspace.
+                  </div>
                 ) : (
-                  members.map((m) => (
-                    <div
-                      key={m.id}
-                      className="p-3.5 rounded-xl border border-border/60 bg-surface/40 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 rounded-full bg-secondary text-secondary-foreground items-center justify-center font-mono text-xs font-bold">
-                          {m.user_id.slice(0, 2).toUpperCase()}
+                  <div className="divide-y divide-border/40 rounded-xl border border-border/60 bg-card overflow-hidden">
+                    {members.map((m) => {
+                      const isSelf = m.userId === user?.id;
+                      return (
+                        <div
+                          key={m.id}
+                          className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {m.avatarUrl ? (
+                              <img
+                                src={m.avatarUrl}
+                                alt={m.fullName}
+                                className="h-9 w-9 rounded-full object-cover border border-border/60"
+                              />
+                            ) : (
+                              <div className="h-9 w-9 rounded-full bg-accent/15 text-accent font-mono text-xs font-bold flex items-center justify-center border border-accent/20">
+                                {m.fullName.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {m.fullName}
+                                </p>
+                                {isSelf && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px] py-0 px-1.5 font-mono"
+                                  >
+                                    You
+                                  </Badge>
+                                )}
+                                {m.isPending && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 px-1.5 font-mono text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10"
+                                  >
+                                    Pending Setup
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {m.email || (m.isPending ? "Pending invitation acceptance" : "—")}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {m.isPending ? "Invited" : "Joined"}{" "}
+                                {new Date(m.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            {canManageMembers && !isSelf && !m.isPending ? (
+                              <Select
+                                value={m.role}
+                                onValueChange={(val) => handleUpdateRole(m.id, val as AppRole)}
+                              >
+                                <SelectTrigger className="h-8 text-xs font-mono uppercase w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="owner">Owner</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="member">Member</SelectItem>
+                                  <SelectItem value="viewer">Viewer</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-xs uppercase text-accent border-accent/60 px-2.5 py-1"
+                              >
+                                {m.role}
+                              </Badge>
+                            )}
+
+                            {canManageMembers && !isSelf && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  m.isPending
+                                    ? handleRevokeInvitation(m.id)
+                                    : handleRemoveMember(m.id)
+                                }
+                                className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                title={m.isPending ? "Revoke invitation" : "Remove member"}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-mono text-xs text-foreground font-semibold">
-                            User ID: {m.user_id.slice(0, 8)}...
-                          </p>
-                          <p className="text-[10px] text-muted-foreground font-mono">
-                            Joined {new Date(m.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Centralized AI Intelligence Architecture */}
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader>
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <Cpu className="h-5 w-5 text-accent" /> Centralized AI Gateway & Engine
+                  Architecture
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Centralized AI gateway topology, model cascade, and deterministic qualification
+                  engine.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
+                        Primary Gateway
+                      </span>
                       <Badge
                         variant="outline"
-                        className="font-mono text-xs uppercase text-accent border-accent/60"
+                        className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       >
-                        {m.role}
+                        Active
                       </Badge>
                     </div>
-                  ))
-                )}
+                    <p className="font-display font-bold text-foreground">
+                      Google Gemini 2.5 Flash
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      High-speed structured extraction, requirements matrix, and evidence parsing.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
+                        Fallback 1
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                      >
+                        Standby
+                      </Badge>
+                    </div>
+                    <p className="font-display font-bold text-foreground">Groq (Llama 3.3 70B)</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Automatic cascade failover on provider timeouts, 429s, or service degradation.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">
+                        Fallback 2
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30"
+                      >
+                        Standby
+                      </Badge>
+                    </div>
+                    <p className="font-display font-bold text-foreground">OpenRouter Gateway</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Secondary cascade failover preserving analysis continuity under peak loads.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-border/60 bg-accent/5 flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-foreground">
+                      Deterministic Scoring Authority
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      AI models extract tender requirements and match evidence. The BID / REVIEW /
+                      NO-BID decision is strictly computed by the deterministic scoring engine
+                      according to your organizational criteria. AI models cannot override your
+                      organization&apos;s human pursuit decision.
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -484,13 +851,18 @@ function SettingsPage() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="font-display text-lg flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-accent" /> Active Subscription & Commercial Entitlement
+                    <CreditCard className="h-5 w-5 text-accent" /> Active Subscription & Commercial
+                    Entitlement
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Deterministic capacity management and PayChangu commercial billing integration.
                   </CardDescription>
                 </div>
-                <Button asChild size="sm" className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 gap-1.5 shadow-sm">
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 gap-1.5 shadow-sm"
+                >
                   <Link to="/billing">
                     Manage Subscription <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
@@ -505,10 +877,13 @@ function SettingsPage() {
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Plan</span>
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                          Active Plan
+                        </span>
                         <div className="flex items-center gap-2">
                           <span className="font-display text-lg font-bold text-foreground">
-                            {billingContext?.planConfig?.name || (workspace?.plan ? workspace.plan.toUpperCase() : "TRIAL")}
+                            {billingContext?.planConfig?.name ||
+                              (workspace?.plan ? workspace.plan.toUpperCase() : "TRIAL")}
                           </span>
                           <Badge
                             variant="outline"
@@ -527,9 +902,13 @@ function SettingsPage() {
                       </div>
 
                       <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Analysis Allowance</span>
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                          Analysis Allowance
+                        </span>
                         <div className="font-display text-lg font-bold text-foreground">
-                          {billingContext?.analysesAllowance === -1 ? "Unlimited" : `${billingContext?.analysesUsed ?? 0} / ${billingContext?.analysesAllowance ?? 3}`}
+                          {billingContext?.analysesAllowance === -1
+                            ? "Unlimited"
+                            : `${billingContext?.analysesUsed ?? 0} / ${billingContext?.analysesAllowance ?? 3}`}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {billingContext?.analysesAllowance === -1
@@ -539,10 +918,16 @@ function SettingsPage() {
                       </div>
 
                       <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Evaluation / Renewal</span>
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                          Evaluation / Renewal
+                        </span>
                         <div className="font-display text-lg font-bold text-foreground">
                           {workspace?.trial_ends_at
-                            ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                            ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
                             : "Monthly Active"}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -555,7 +940,9 @@ function SettingsPage() {
 
                     <div className="p-4 rounded-xl border border-border/60 bg-card space-y-3">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-foreground">Monthly Capacity Utilization</span>
+                        <span className="font-medium text-foreground">
+                          Monthly Capacity Utilization
+                        </span>
                         <span className="font-mono text-muted-foreground">
                           {billingContext?.analysesAllowance === -1
                             ? "Unlimited Allocation"
@@ -577,15 +964,20 @@ function SettingsPage() {
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-accent/5 border border-accent/20">
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-semibold text-foreground">Upgrade or Switch Commercial Plan</h4>
+                        <h4 className="text-sm font-semibold text-foreground">
+                          Upgrade or Switch Commercial Plan
+                        </h4>
                         <p className="text-xs text-muted-foreground">
-                          Upgrade to Growth or Pro Enterprise with instant checkout via PayChangu (MWK / USD).
+                          Upgrade to Growth or Pro Enterprise with instant checkout via PayChangu
+                          (MWK / USD).
                         </p>
                       </div>
-                      <Button asChild size="sm" className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 shadow-sm shrink-0">
-                        <Link to="/billing">
-                          View All Plans & Upgrade →
-                        </Link>
+                      <Button
+                        asChild
+                        size="sm"
+                        className="bg-accent text-accent-foreground font-semibold hover:bg-accent/90 shadow-sm shrink-0"
+                      >
+                        <Link to="/billing">View All Plans & Upgrade →</Link>
                       </Button>
                     </div>
                   </div>

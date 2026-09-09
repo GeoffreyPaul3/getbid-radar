@@ -15,9 +15,7 @@ import {
   canAnalyzeTender,
   recordAnalysisUsage,
 } from "./entitlements.server";
-import {
-  verifyAndActivatePayChanguPayment,
-} from "./paychangu.server";
+import { verifyAndActivatePayChanguPayment } from "./paychangu.server";
 
 describe("Plan Configuration & Pricing Architecture", () => {
   it("defines exact plans with no perpetual free plan", () => {

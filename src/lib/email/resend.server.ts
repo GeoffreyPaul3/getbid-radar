@@ -4,6 +4,7 @@ import {
   getPlanConfig,
   formatBillingAmount,
 } from "../billing/plans";
+import { ensureServerEnv } from "../server-env";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -14,6 +15,7 @@ interface SendEmailResult {
 }
 
 function getResendApiKey(): string | null {
+  ensureServerEnv();
   const key = process.env["RESEND_API_KEY"];
   return key && key.trim() !== "" ? key.trim() : null;
 }
@@ -30,7 +32,9 @@ async function sendViaResend(params: {
 }): Promise<SendEmailResult> {
   const apiKey = getResendApiKey();
   if (!apiKey) {
-    console.warn(`[Resend] RESEND_API_KEY is not configured. Email to <${params.to}> suppressed: "${params.subject}"`);
+    console.warn(
+      `[Resend] RESEND_API_KEY is not configured. Email to <${params.to}> suppressed: "${params.subject}"`,
+    );
     return { success: false, reason: "API_KEY_NOT_CONFIGURED" };
   }
 
@@ -170,4 +174,56 @@ export async function sendPaymentConfirmedEmail(params: {
   `;
 
   return sendViaResend({ to: params.to, subject, text, html });
+}
+
+/**
+ * Send secure workspace member invitation email via Resend.
+ * Does NOT send or require plaintext passwords.
+ */
+export async function sendMemberInvitationEmail(params: {
+  toEmail: string;
+  fullName: string;
+  invitedByName: string;
+  workspaceName: string;
+  role: string;
+  setupUrl?: string | undefined;
+}): Promise<SendEmailResult> {
+  const appUrl = process.env["APP_URL"] || "https://getbidradar.com";
+  const setupUrl = params.setupUrl || `${appUrl}/login`;
+
+  const subject = `You've been invited to join ${params.workspaceName} on GetBidRadar`;
+  const text = `Hello ${params.fullName},\n\n${params.invitedByName} has invited you to join ${params.workspaceName} on GetBidRadar as a ${params.role.toUpperCase()}.\n\nAccept your invitation and sign in: ${setupUrl}\n\nGetBidRadar helps organizations evaluate procurement opportunities, verify evidence, coordinate bid execution, and submit winning proposals with certainty.\n\nThe GetBidRadar Team`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 20px; border-bottom: 1px solid #E4E7EC;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 22px;">GetBidRadar</h2>
+        <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Enterprise Workspace Invitation</p>
+      </div>
+      <div style="padding: 24px 0;">
+        <p style="font-size: 15px; margin-top: 0;">Hello <strong>${params.fullName}</strong>,</p>
+        <p style="font-size: 14px; color: #344054; line-height: 1.6;">
+          <strong>${params.invitedByName}</strong> has invited you to join the <strong>${params.workspaceName}</strong> workspace on GetBidRadar with the role of <strong>${params.role.toUpperCase()}</strong>.
+        </p>
+        <div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #667085; font-weight: 600;">Invitation Details</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Workspace:</strong> ${params.workspaceName}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Assigned Role:</strong> <span style="text-transform: uppercase; font-family: monospace; color: #2563EB; font-weight: 700;">${params.role}</span></p>
+        </div>
+        <div style="margin: 28px 0;">
+          <a href="${setupUrl}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+            Accept Invitation & Access Workspace →
+          </a>
+        </div>
+        <p style="color: #667085; font-size: 13px; line-height: 1.5;">
+          For security, sign in with your email address (<strong>${params.toEmail}</strong>) or complete your secure account setup.
+        </p>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar. Enterprise procurement intelligence.
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({ to: params.toEmail, subject, text, html });
 }

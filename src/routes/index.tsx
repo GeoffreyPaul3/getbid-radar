@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import logo from "@/assets/bidradar.png"
+import logo from "@/assets/bidradar.png";
 import {
   Radar,
   ArrowRight,
@@ -40,8 +40,7 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2.5 group">
-              <img src={logo} width={160} height={130} alt="BidRadar"  />                            
-              
+              <img src={logo} width={160} height={130} alt="BidRadar" />
             </Link>
             <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-text-secondary">
               <a href="#problem" className="hover:text-foreground transition-colors">
@@ -533,8 +532,7 @@ function LandingPage() {
       <section className="py-20 border-t border-border bg-surface">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center justify-center  mb-6 ">
-          
-              <img src={logo} width={160} height={130} alt="BidRadar"  />                              
+            <img src={logo} width={160} height={130} alt="BidRadar" />
           </div>
           <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-foreground tracking-tight mb-4">
             Evaluate your next contract with decision intelligence.
@@ -560,9 +558,9 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link to="/" className="flex items-center">
-              <img src={logo} width={140} height={130} alt="BidRadar"  />                              
+              <img src={logo} width={140} height={130} alt="BidRadar" />
             </Link>
-            
+
             <span>— Enterprise Contract Intelligence Engine</span>
           </div>
           <p>© {new Date().getFullYear()} GetBidRadar. All rights reserved.</p>

@@ -17,6 +17,7 @@
  *   - No client-provided system prompt is ever accepted.
  */
 import { z } from "zod";
+import { ensureServerEnv } from "../server-env";
 
 // ──────────────────────────────────────────────────────────────
 // Provider constants
@@ -50,8 +51,10 @@ export type AiUsage = {
 
 export type AiFailureCode =
   | "not_configured"
+  | "authentication_failed"
   | "timeout"
   | "provider_error"
+  | "provider_unavailable"
   | "rate_limited"
   | "payment_required"
   | "malformed_response"
@@ -212,6 +215,15 @@ class GeminiProviderAdapter implements ProviderAdapter {
         };
       }
 
+      if (response.status === 503) {
+        return {
+          ok: false as const,
+          code: "provider_unavailable" as const,
+          message: "Gemini API service is temporarily unavailable.",
+          retryable: true,
+        };
+      }
+
       if (!response.ok) {
         let errorBody: { error?: { message?: string; status?: string } } | undefined;
         try {
@@ -223,21 +235,16 @@ class GeminiProviderAdapter implements ProviderAdapter {
         const errorMsg = maskSecrets(rawMsg, [apiKey]);
 
         if (
-          response.status === 400 &&
-          (errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID"))
+          (response.status === 400 &&
+            (errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID"))) ||
+          response.status === 401 ||
+          response.status === 403 ||
+          errorMsg.includes("PERMISSION_DENIED")
         ) {
           return {
             ok: false as const,
-            code: "provider_error" as const,
-            message: "Invalid Gemini API key.",
-            retryable: false,
-          };
-        }
-        if (response.status === 403 || errorMsg.includes("PERMISSION_DENIED")) {
-          return {
-            ok: false as const,
-            code: "provider_error" as const,
-            message: "Gemini API permission denied.",
+            code: "authentication_failed" as const,
+            message: "Invalid Gemini API key or permission denied.",
             retryable: false,
           };
         }
@@ -251,7 +258,10 @@ class GeminiProviderAdapter implements ProviderAdapter {
         }
         return {
           ok: false as const,
-          code: "provider_error" as const,
+          code:
+            response.status === 503
+              ? ("provider_unavailable" as const)
+              : ("provider_error" as const),
           message: errorMsg,
           retryable: response.status >= 500,
         };
@@ -356,12 +366,28 @@ class GroqProviderAdapter implements ProviderAdapter {
           retryable: false,
         };
       }
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false as const,
+          code: "authentication_failed" as const,
+          message: "Groq API authentication failed.",
+          retryable: false,
+        };
+      }
       if (response.status === 402) {
         return {
           ok: false as const,
           code: "payment_required" as const,
           message: "Groq credits exhausted.",
           retryable: false,
+        };
+      }
+      if (response.status === 503) {
+        return {
+          ok: false as const,
+          code: "provider_unavailable" as const,
+          message: "Groq service is temporarily unavailable.",
+          retryable: true,
         };
       }
       if (!response.ok) {
@@ -376,7 +402,10 @@ class GroqProviderAdapter implements ProviderAdapter {
         }
         return {
           ok: false as const,
-          code: "provider_error" as const,
+          code:
+            response.status >= 500
+              ? ("provider_unavailable" as const)
+              : ("provider_error" as const),
           message: errorMsg,
           retryable: response.status >= 500,
         };
@@ -467,12 +496,28 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
           retryable: false,
         };
       }
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false as const,
+          code: "authentication_failed" as const,
+          message: "OpenRouter authentication failed.",
+          retryable: false,
+        };
+      }
       if (response.status === 402) {
         return {
           ok: false as const,
           code: "payment_required" as const,
           message: "OpenRouter credits exhausted.",
           retryable: false,
+        };
+      }
+      if (response.status === 503) {
+        return {
+          ok: false as const,
+          code: "provider_unavailable" as const,
+          message: "OpenRouter service is temporarily unavailable.",
+          retryable: true,
         };
       }
       if (!response.ok) {
@@ -487,7 +532,10 @@ class OpenRouterProviderAdapter implements ProviderAdapter {
         }
         return {
           ok: false as const,
-          code: "provider_error" as const,
+          code:
+            response.status >= 500
+              ? ("provider_unavailable" as const)
+              : ("provider_error" as const),
           message: errorMsg,
           retryable: response.status >= 500,
         };
@@ -543,13 +591,20 @@ type ProviderConfig = {
  * Codes like validation_failed / malformed_response are content problems and
  * do NOT cascade to another provider (they retry within the same provider).
  */
-const CASCADE_CODES = new Set<AiFailureCode>(["rate_limited", "payment_required", "timeout"]);
+const CASCADE_CODES = new Set<AiFailureCode>([
+  "rate_limited",
+  "payment_required",
+  "timeout",
+  "provider_unavailable",
+  "authentication_failed",
+]);
 
 /**
  * Build the ordered list of available providers from environment.
  * Provider is excluded if its key is absent or empty.
  */
 function buildProviderCascade(modelOverride?: string): ProviderConfig[] {
+  ensureServerEnv();
   const providers: ProviderConfig[] = [];
 
   const geminiKey = process.env["GEMINI_API_KEY"];

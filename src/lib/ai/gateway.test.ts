@@ -215,11 +215,29 @@ describe("callStructuredAi", () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.code).toBe("provider_error");
+        expect(result.code).toBe("authentication_failed");
         expect(result.message).toContain("Invalid Gemini API key");
         expect(result.usage.attempts).toBe(1);
       }
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles Gemini HTTP 503 error as provider_unavailable", async () => {
+      process.env["GEMINI_API_KEY"] = "gemini-key";
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: { message: "Service Unavailable" } }),
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const result = await callStructuredAi({ ...baseOptions, maxAttempts: 1 });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("provider_unavailable");
+      }
     });
 
     it("maps Gemini RESOURCE_EXHAUSTED / quota exceeded to rate_limited", async () => {

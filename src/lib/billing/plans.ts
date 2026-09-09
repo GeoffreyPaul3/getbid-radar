@@ -86,7 +86,8 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
     tier: "pro",
     name: "Pro Enterprise",
     tagline: "For dedicated proposal divisions",
-    description: "Unlimited contract intelligence and multi-seat bid command for high-volume firms.",
+    description:
+      "Unlimited contract intelligence and multi-seat bid command for high-volume firms.",
     monthlyPrice: {
       MWK: 280_000,
       USD: 165,
@@ -111,11 +112,16 @@ export const PURCHASABLE_PLANS: PlanTier[] = ["starter", "growth", "pro"];
 export const SUPPORTED_CURRENCIES: BillingCurrency[] = ["MWK", "USD"];
 
 export function isPlanTier(value: unknown): value is PlanTier {
-  return typeof value === "string" && (value === "trial" || value === "starter" || value === "growth" || value === "pro");
+  return (
+    typeof value === "string" &&
+    (value === "trial" || value === "starter" || value === "growth" || value === "pro")
+  );
 }
 
 export function isPurchasablePlan(value: unknown): value is "starter" | "growth" | "pro" {
-  return typeof value === "string" && (value === "starter" || value === "growth" || value === "pro");
+  return (
+    typeof value === "string" && (value === "starter" || value === "growth" || value === "pro")
+  );
 }
 
 export function isBillingCurrency(value: unknown): value is BillingCurrency {
@@ -144,4 +150,30 @@ export function formatBillingAmount(amount: number, currency: BillingCurrency): 
     return `MWK ${amount.toLocaleString("en-US")}`;
   }
   return `$${amount.toLocaleString("en-US")}`;
+}
+
+export interface VerifyPaymentResult {
+  status: "successful" | "pending" | "failed" | "verification_failed";
+  plan: PlanTier;
+  amount: number;
+  currency: BillingCurrency;
+  txRef: string;
+  message: string;
+  activatedAt?: string;
+  alreadyActivated?: boolean;
+}
+
+export interface WorkspaceBillingContext {
+  workspaceId: string;
+  plan: PlanTier;
+  planConfig: PlanConfig;
+  subscriptionStatus: string;
+  trialEndsAt: string | null;
+  isTrialExpired: boolean;
+  analysesUsed: number;
+  analysesAllowance: number; // -1 for unlimited
+  remainingAnalyses: number | null; // null if unlimited
+  canAnalyze: boolean;
+  blockReason: "TRIAL_EXPIRED" | "ALLOWANCE_EXCEEDED" | "SUBSCRIPTION_INACTIVE" | null;
+  periodStart: string;
 }

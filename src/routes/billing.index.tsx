@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import {
   CreditCard,
   CheckCircle2,
@@ -26,12 +33,16 @@ import {
   formatBillingAmount,
   type PlanTier,
   type BillingCurrency,
+  type WorkspaceBillingContext,
 } from "@/lib/billing/plans";
 import {
   getWorkspaceBillingFn,
   initiateCheckoutFn,
   getBillingHistoryFn,
 } from "@/lib/billing/billing.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type BillingTransactionRow = Database["public"]["Tables"]["billing_transactions"]["Row"];
 
 export const Route = createFileRoute("/billing/")({
   component: BillingPage,
@@ -42,12 +53,13 @@ function BillingPage() {
   const navigate = useNavigate();
 
   // Selected currency (defaults to MWK if Malawi, otherwise USD)
-  const defaultCurrency: BillingCurrency =
-    companyProfile?.country?.toLowerCase().includes("malawi") ? "MWK" : "USD";
+  const defaultCurrency: BillingCurrency = companyProfile?.country?.toLowerCase().includes("malawi")
+    ? "MWK"
+    : "USD";
 
   const [currency, setCurrency] = useState<BillingCurrency>(defaultCurrency);
-  const [billingContext, setBillingContext] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [billingContext, setBillingContext] = useState<WorkspaceBillingContext | null>(null);
+  const [transactions, setTransactions] = useState<BillingTransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<PlanTier | null>(null);
 
@@ -57,7 +69,7 @@ function BillingPage() {
     }
   }, [companyProfile?.country]);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!workspace) return;
     setLoading(true);
     try {
@@ -65,19 +77,19 @@ function BillingPage() {
         getWorkspaceBillingFn({ data: { workspaceId: workspace.id } }),
         getBillingHistoryFn({ data: { workspaceId: workspace.id } }),
       ]);
-      setBillingContext(billing);
-      setTransactions(history);
+      setBillingContext(billing as WorkspaceBillingContext);
+      setTransactions(history as BillingTransactionRow[]);
     } catch (err) {
       console.error("[Billing] Failed to load billing details:", err);
       toast.error("Could not load billing details. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspace]);
 
   useEffect(() => {
     loadData();
-  }, [workspace]);
+  }, [loadData]);
 
   async function handleSelectPlan(plan: "starter" | "growth" | "pro") {
     if (!workspace) return;
@@ -172,15 +184,21 @@ function BillingPage() {
           <CardContent className="pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Monthly Allowance</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Monthly Allowance
+                </span>
                 <div className="font-display text-xl font-bold text-foreground">
-                  {currentPlanConfig.analysisAllowance === -1 ? "Unlimited" : `${currentPlanConfig.analysisAllowance} analyses/mo`}
+                  {currentPlanConfig.analysisAllowance === -1
+                    ? "Unlimited"
+                    : `${currentPlanConfig.analysisAllowance} analyses/mo`}
                 </div>
                 <p className="text-xs text-muted-foreground">Deterministic qualification runs</p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Utilized This Month</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Utilized This Month
+                </span>
                 <div className="font-display text-xl font-bold text-foreground">
                   {billingContext?.analysesUsed ?? 0}
                 </div>
@@ -192,10 +210,16 @@ function BillingPage() {
               </div>
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Renewal / Expiry</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Renewal / Expiry
+                </span>
                 <div className="font-display text-xl font-bold text-foreground">
                   {workspace?.trial_ends_at
-                    ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
                     : "Active Period"}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -208,11 +232,13 @@ function BillingPage() {
 
             {/* Trial Expiration Warning if active on trial */}
             {currentPlan === "trial" && (
-              <div className={`mt-4 p-3.5 rounded-xl border flex items-start gap-3 ${
-                billingContext?.isTrialExpired
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
-              }`}>
+              <div
+                className={`mt-4 p-3.5 rounded-xl border flex items-start gap-3 ${
+                  billingContext?.isTrialExpired
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
+                }`}
+              >
                 <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                 <div className="text-xs space-y-1">
                   <p className="font-bold">
@@ -221,7 +247,8 @@ function BillingPage() {
                       : "You are currently on a 14-day evaluation pilot."}
                   </p>
                   <p className="text-muted-foreground">
-                    GetBidRadar does not offer a permanent free plan. Select a commercial plan below to unlock regular monthly capacity and keep your team active.
+                    GetBidRadar does not offer a permanent free plan. Select a commercial plan below
+                    to unlock regular monthly capacity and keep your team active.
                   </p>
                 </div>
               </div>
@@ -258,7 +285,9 @@ function BillingPage() {
                 >
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-display text-lg font-bold text-foreground">{plan.name}</span>
+                      <span className="font-display text-lg font-bold text-foreground">
+                        {plan.name}
+                      </span>
                       {plan.badge && (
                         <Badge className="bg-accent/15 text-accent border border-accent/30 text-[10px] uppercase font-mono font-bold">
                           {plan.badge}
@@ -334,7 +363,9 @@ function BillingPage() {
         <div className="space-y-4 pt-6 border-t border-border/60">
           <div className="flex items-center gap-2">
             <History className="h-5 w-5 text-accent" />
-            <h3 className="font-display text-lg font-bold text-foreground">Billing Transaction History</h3>
+            <h3 className="font-display text-lg font-bold text-foreground">
+              Billing Transaction History
+            </h3>
           </div>
 
           <Card className="border border-border/80 shadow-panel bg-card overflow-hidden">
@@ -352,7 +383,10 @@ function BillingPage() {
                 <tbody className="divide-y divide-border/40 font-mono">
                   {transactions.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-muted-foreground font-sans text-xs">
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-muted-foreground font-sans text-xs"
+                      >
                         No payment transactions recorded for this workspace yet.
                       </td>
                     </tr>
@@ -372,9 +406,7 @@ function BillingPage() {
                         <td className="py-3 px-4 text-foreground font-bold">
                           {formatBillingAmount(Number(tx.amount), tx.currency as BillingCurrency)}
                         </td>
-                        <td className="py-3 px-4 text-muted-foreground text-[11px]">
-                          {tx.tx_ref}
-                        </td>
+                        <td className="py-3 px-4 text-muted-foreground text-[11px]">{tx.tx_ref}</td>
                         <td className="py-3 px-4 text-right">
                           <Badge
                             variant="outline"

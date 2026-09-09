@@ -3,26 +3,13 @@ import type { Database } from "@/integrations/supabase/types";
 import {
   type PlanTier,
   type PlanConfig,
+  type WorkspaceBillingContext,
   getPlanConfig,
   isPlanTier,
 } from "./plans";
 
 export type Client = SupabaseClient<Database>;
-
-export interface WorkspaceBillingContext {
-  workspaceId: string;
-  plan: PlanTier;
-  planConfig: PlanConfig;
-  subscriptionStatus: string;
-  trialEndsAt: string | null;
-  isTrialExpired: boolean;
-  analysesUsed: number;
-  analysesAllowance: number; // -1 for unlimited
-  remainingAnalyses: number | null; // null if unlimited
-  canAnalyze: boolean;
-  blockReason: "TRIAL_EXPIRED" | "ALLOWANCE_EXCEEDED" | "SUBSCRIPTION_INACTIVE" | null;
-  periodStart: string;
-}
+export type { WorkspaceBillingContext };
 
 export async function getWorkspaceBillingContext(
   supabase: Client,
@@ -125,11 +112,13 @@ export async function canAnalyzeTender(
   if (!context.canAnalyze) {
     let message = "Analysis limit reached. Upgrade to continue.";
     if (context.blockReason === "TRIAL_EXPIRED") {
-      message = "Your 14-day evaluation has expired. Please select a commercial plan to continue qualifying tenders.";
+      message =
+        "Your 14-day evaluation has expired. Please select a commercial plan to continue qualifying tenders.";
     } else if (context.blockReason === "ALLOWANCE_EXCEEDED") {
       message = `You have utilized all ${context.analysesAllowance} analyses included in your ${context.planConfig.name} plan for this billing period. Upgrade your plan for additional capacity.`;
     } else if (context.blockReason === "SUBSCRIPTION_INACTIVE") {
-      message = "Your subscription is inactive or past due. Please update payment to resume tender analysis.";
+      message =
+        "Your subscription is inactive or past due. Please update payment to resume tender analysis.";
     }
     return {
       allowed: false,

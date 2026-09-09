@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { ensureServerEnv } from "../server-env";
 import {
   type PlanTier,
   type BillingCurrency,
+  type VerifyPaymentResult,
   getPlanConfig,
   getPlanPrice,
   isPurchasablePlan,
@@ -11,6 +13,7 @@ import {
 } from "./plans";
 
 export type Client = SupabaseClient<Database>;
+export type { VerifyPaymentResult };
 
 const PAYCHANGU_API_URL = "https://api.paychangu.com";
 
@@ -33,18 +36,8 @@ export interface InitiateCheckoutResult {
   currency: BillingCurrency;
 }
 
-export interface VerifyPaymentResult {
-  status: "successful" | "pending" | "failed" | "verification_failed";
-  plan: PlanTier;
-  amount: number;
-  currency: BillingCurrency;
-  txRef: string;
-  message: string;
-  activatedAt?: string;
-  alreadyActivated?: boolean;
-}
-
 function getPayChanguSecretKey(): string {
+  ensureServerEnv();
   const key = process.env["PAYCHANGU_SECRET_KEY"];
   if (!key || key.trim() === "") {
     throw new Error("PAYCHANGU_SECRET_KEY is not configured on the server");
@@ -103,7 +96,8 @@ export async function initiatePayChanguCheckout(
   const firstName = names[0] || "Contract";
   const lastName = names.slice(1).join(" ") || "Professional";
 
-  const callbackUrl = params.returnUrlOverride || `${appUrl}/billing/confirm?tx_ref=${encodeURIComponent(txRef)}`;
+  const callbackUrl =
+    params.returnUrlOverride || `${appUrl}/billing/confirm?tx_ref=${encodeURIComponent(txRef)}`;
 
   const payload = {
     amount,
@@ -247,13 +241,16 @@ export async function verifyAndActivatePayChanguPayment(params: {
 
   let verifyResponse: Response;
   try {
-    verifyResponse = await fetch(`${PAYCHANGU_API_URL}/verify-payment/${encodeURIComponent(txRef.trim())}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${secretKey}`,
+    verifyResponse = await fetch(
+      `${PAYCHANGU_API_URL}/verify-payment/${encodeURIComponent(txRef.trim())}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${secretKey}`,
+        },
       },
-    });
+    );
   } catch (netErr: unknown) {
     const errorMsg = netErr instanceof Error ? netErr.message : String(netErr);
     console.error("[PayChangu] Verification network error:", errorMsg);
@@ -291,7 +288,11 @@ export async function verifyAndActivatePayChanguPayment(params: {
 
   if (!isSuccess) {
     // If provider indicates pending or not yet completed
-    if (innerStatus === "pending" || rawJson.message?.includes("not created") || rawJson.message?.includes("pending")) {
+    if (
+      innerStatus === "pending" ||
+      rawJson.message?.includes("not created") ||
+      rawJson.message?.includes("pending")
+    ) {
       return {
         status: "pending",
         plan: transaction.plan as PlanTier,

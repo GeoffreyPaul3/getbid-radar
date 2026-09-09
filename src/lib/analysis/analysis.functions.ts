@@ -26,7 +26,8 @@ export const analyzeOpportunity = createServerFn({ method: "POST" })
       throw new Error("Opportunity not found or unauthorized.");
     }
 
-    const { canAnalyzeTender, recordAnalysisUsage } = await import("../billing/entitlements.server");
+    const { canAnalyzeTender, recordAnalysisUsage } =
+      await import("../billing/entitlements.server");
     const { allowed, reason } = await canAnalyzeTender(context.supabase, opp.workspace_id);
     if (!allowed) {
       throw new Error(reason || "Tender analysis entitlement exceeded. Please upgrade your plan.");
@@ -41,7 +42,12 @@ export const analyzeOpportunity = createServerFn({ method: "POST" })
     });
 
     if (result && result.ok) {
-      await recordAnalysisUsage(context.supabase, opp.workspace_id, data.opportunityId, context.userId);
+      await recordAnalysisUsage(
+        context.supabase,
+        opp.workspace_id,
+        data.opportunityId,
+        context.userId,
+      );
     }
 
     return result;

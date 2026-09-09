@@ -225,7 +225,14 @@ function IntelligenceReportPage() {
   }
 
   const isProcessing = opportunity.analysis_status === "processing";
-  const hasAnalysis = Boolean(analysis);
+  const isFailed = opportunity.analysis_status === "failed" || analysis?.status === "failed";
+  const isCompleted =
+    !isProcessing &&
+    !isFailed &&
+    Boolean(
+      analysis && analysis.status === "completed" && opportunity.analysis_status === "completed",
+    );
+  const hasAnalysis = isCompleted;
   const rec = analysis?.recommendation?.toLowerCase();
   const humanOverride = analysis?.human_override?.toLowerCase();
   const blockers = (analysis?.critical_blockers as string[]) || [];
@@ -358,34 +365,66 @@ function IntelligenceReportPage() {
         )}
 
         {/* FAILED STATE */}
-        {!isProcessing && opportunity.analysis_status === "failed" && (
+        {!isProcessing && isFailed && (
           <Card className="border-destructive/40 bg-destructive/5 shadow-panel">
-            <CardContent className="p-6 flex items-start gap-4">
-              <AlertTriangle className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1">
-                <h4 className="font-display font-semibold text-sm text-destructive">
-                  Analysis Pipeline Encountered an Error
-                </h4>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {opportunity.analysis_error || analysis?.error_message || "Execution error"}
-                </p>
-                <div className="pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleTriggerAnalysis(true)}
-                    className="text-xs"
-                  >
-                    Retry Analysis
-                  </Button>
+            <CardContent className="p-6 md:p-8 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive shrink-0 mt-0.5">
+                  <AlertTriangle className="h-6 w-6" />
                 </div>
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="destructive" className="font-mono text-xs uppercase font-bold">
+                      Analysis Unavailable
+                    </Badge>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Status: Execution Failed
+                    </span>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-foreground">
+                    Tender Qualification Engine Stopped
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                    The qualification engine could not complete because requirement extraction or AI
+                    analysis failed. No BID, REVIEW, or NO-BID recommendation was produced.
+                    Qualification scores, confidence metrics, and strategic conclusions remain
+                    uncomputed to prevent misleading evaluation.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg border border-destructive/20 bg-background/80 space-y-1.5">
+                <span className="text-[10px] uppercase font-mono font-bold text-muted-foreground block">
+                  Error Diagnostic:
+                </span>
+                <p className="text-xs font-mono text-destructive break-words">
+                  {opportunity.analysis_error ||
+                    analysis?.error_message ||
+                    "The AI analysis provider was unable to complete structured requirement extraction."}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button
+                  onClick={() => handleTriggerAnalysis(true)}
+                  disabled={isReanalyzing}
+                  className="bg-primary text-primary-foreground font-medium text-xs shadow-sm"
+                >
+                  <RotateCcw
+                    className={`h-3.5 w-3.5 mr-1.5 ${isReanalyzing ? "animate-spin" : ""}`}
+                  />
+                  {isReanalyzing ? "Retrying Analysis..." : "Retry Analysis"}
+                </Button>
+                <Button asChild variant="outline" size="sm" className="text-xs">
+                  <Link to="/tenders">Return to Tenders</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
         {/* UNANALYZED STATE */}
-        {!isProcessing && !hasAnalysis && opportunity.analysis_status !== "failed" && (
+        {!isProcessing && !isCompleted && !isFailed && (
           <Card className="border border-border bg-card shadow-panel text-center p-12 space-y-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground mx-auto">
               <Sparkles className="h-6 w-6 text-accent" />
@@ -418,7 +457,7 @@ function IntelligenceReportPage() {
         )}
 
         {/* COMPLETE INTELLIGENCE REPORT */}
-        {hasAnalysis && (
+        {isCompleted && (
           <div className="space-y-6">
             {/* 1. Core Decision Banner: BID / REVIEW / NO-BID */}
             <div

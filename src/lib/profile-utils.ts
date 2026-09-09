@@ -44,4 +44,3 @@ export function parseFormattedNumber(value: string): number | "" {
   if (cleaned === "" || isNaN(Number(cleaned))) return "";
   return Number(cleaned);
 }
-
