@@ -170,10 +170,17 @@ export interface WorkspaceBillingContext {
   subscriptionStatus: string;
   trialEndsAt: string | null;
   isTrialExpired: boolean;
+  isTrial: boolean;
   analysesUsed: number;
   analysesAllowance: number; // -1 for unlimited
   remainingAnalyses: number | null; // null if unlimited
   canAnalyze: boolean;
   blockReason: "TRIAL_EXPIRED" | "ALLOWANCE_EXCEEDED" | "SUBSCRIPTION_INACTIVE" | null;
   periodStart: string;
+  periodEnd: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  renewalDate: string | null;
+  /** Human-readable countdown, e.g. "Renews in 24 days" or "Trial ends in 3 days" */
+  countdownText: string;
 }

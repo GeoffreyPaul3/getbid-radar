@@ -420,12 +420,17 @@ export async function verifyAndActivatePayChanguPayment(params: {
     console.error("[PayChangu] Failed to update transaction status:", updateTxErr.message);
   }
 
-  // Update workspace plan and subscription status
+  // Update workspace plan, subscription status, and authoritative billing period
+  const periodEnd = new Date(new Date(activationTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
   const { error: updateWsErr } = await supabase
     .from("workspaces")
     .update({
       plan: transaction.plan,
       subscription_status: "active",
+      subscription_started_at: activationTime,
+      current_period_start: activationTime,
+      current_period_end: periodEnd,
+      renewal_date: periodEnd,
       updated_at: activationTime,
     })
     .eq("id", workspaceId);
@@ -433,6 +438,19 @@ export async function verifyAndActivatePayChanguPayment(params: {
   if (updateWsErr) {
     console.error("[PayChangu] Critical error updating workspace plan:", updateWsErr.message);
     throw new Error(`Failed to activate workspace subscription: ${updateWsErr.message}`);
+  }
+
+  // Tag all prior usage records (created before activation) as 'trial' so they
+  // are never counted in the paid subscription allowance
+  try {
+    await supabase
+      .from("usage_records")
+      .update({ plan: "trial" })
+      .eq("workspace_id", workspaceId)
+      .lt("created_at", activationTime)
+      .is("plan", null);
+  } catch (tagErr) {
+    console.warn("[PayChangu] Could not tag pre-activation usage records as trial:", tagErr);
   }
 
   // Record audit log

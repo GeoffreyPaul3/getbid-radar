@@ -51,8 +51,15 @@ import {
   Save,
   XCircle,
   ArrowUpRight,
+  Send,
+  Trophy,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ProposalWorkspaceTab } from "@/components/workspace/ProposalWorkspaceTab";
+import { ComplianceAuditTab } from "@/components/workspace/ComplianceAuditTab";
+import { SubmissionTrackingTab } from "@/components/workspace/SubmissionTrackingTab";
+import { OutcomesLearningTab } from "@/components/workspace/OutcomesLearningTab";
 import type { Database } from "@/integrations/supabase/types";
 import {
   calculateReadiness,
@@ -146,6 +153,11 @@ function BidWorkspacePage() {
 
   // View mode: "kanban" | "list"
   const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
+
+  // Active Workspace Sub-Tab
+  const [activeTab, setActiveTab] = useState<
+    "tasks" | "proposal" | "compliance" | "submission" | "outcomes"
+  >("tasks");
 
   // New Task Dialog
   const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -617,8 +629,69 @@ function BidWorkspacePage() {
           </Link>
         </div>
 
-        {/* ── Operational Deadline Intelligence ─────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ── Command Center Sub-Tabs ──────────────────────── */}
+        <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-xl border border-border/60 overflow-x-auto text-xs">
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+              activeTab === "tasks"
+                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ListTodo className="h-3.5 w-3.5 text-accent" />
+            Tasks & Readiness
+          </button>
+          <button
+            onClick={() => setActiveTab("proposal")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+              activeTab === "proposal"
+                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5 text-accent" />
+            Proposal Workspace
+          </button>
+          <button
+            onClick={() => setActiveTab("compliance")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+              activeTab === "compliance"
+                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ShieldAlert className="h-3.5 w-3.5 text-accent" />
+            Compliance Auditor
+          </button>
+          <button
+            onClick={() => setActiveTab("submission")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+              activeTab === "submission"
+                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Send className="h-3.5 w-3.5 text-accent" />
+            Submission Tracking
+          </button>
+          <button
+            onClick={() => setActiveTab("outcomes")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+              activeTab === "outcomes"
+                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Trophy className="h-3.5 w-3.5 text-accent" />
+            Outcomes & Debrief
+          </button>
+        </div>
+
+        {activeTab === "tasks" && (
+          <>
+            {/* ── Operational Deadline Intelligence ─────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Deadline card */}
           <Card
             className={`border p-5 ${dl.urgencyLevel !== "none" ? ug.bg : "border-border/80 bg-card"}`}
@@ -1202,7 +1275,42 @@ function BidWorkspacePage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </AppShell>
+      </>
+    )}
+
+    {activeTab === "proposal" && (
+      <ProposalWorkspaceTab
+        opportunityId={id || ""}
+        workspaceId={workspace?.id || ""}
+        opportunityTitle={opportunity?.title}
+      />
+    )}
+
+    {activeTab === "compliance" && (
+      <ComplianceAuditTab
+        opportunityId={id || ""}
+        workspaceId={workspace?.id || ""}
+      />
+    )}
+
+    {activeTab === "submission" && (
+      <SubmissionTrackingTab
+        opportunityId={id || ""}
+        workspaceId={workspace?.id || ""}
+        contractCurrency={opportunity?.currency ?? null}
+        contractValue={opportunity?.contract_value ?? null}
+      />
+    )}
+
+    {activeTab === "outcomes" && (
+      <OutcomesLearningTab
+        opportunityId={id || ""}
+        workspaceId={workspace?.id || ""}
+        contractCurrency={opportunity?.currency ?? null}
+        contractValue={opportunity?.contract_value ?? null}
+      />
+    )}
+  </div>
+</AppShell>
   );
 }

@@ -11,13 +11,26 @@ import {
 export type Client = SupabaseClient<Database>;
 export type { WorkspaceBillingContext };
 
+/** Format a day count into a human countdown string. */
+function countdownText(ms: number, prefix: string): string {
+  if (ms <= 0) return `${prefix} expired`;
+  const days = Math.ceil(ms / 86400000);
+  if (days === 1) return `${prefix} tomorrow`;
+  if (days <= 7) return `${prefix} in ${days} days`;
+  if (days <= 30) return `${prefix} in ${days} days`;
+  const months = Math.round(days / 30);
+  return `${prefix} in ~${months} month${months !== 1 ? "s" : ""}`;
+}
+
 export async function getWorkspaceBillingContext(
   supabase: Client,
   workspaceId: string,
 ): Promise<WorkspaceBillingContext> {
   const { data: ws, error: wsErr } = await supabase
     .from("workspaces")
-    .select("id, plan, subscription_status, trial_ends_at, created_at")
+    .select(
+      "id, plan, subscription_status, trial_ends_at, created_at, current_period_start, current_period_end, renewal_date",
+    )
     .eq("id", workspaceId)
     .single();
 
@@ -27,31 +40,71 @@ export async function getWorkspaceBillingContext(
 
   const rawPlan = ws.plan;
   const plan: PlanTier = isPlanTier(rawPlan) ? rawPlan : "trial";
-  const planConfig = getPlanConfig(plan);
+  const planConfig: PlanConfig = getPlanConfig(plan);
   const subscriptionStatus = ws.subscription_status || "trialing";
   const now = new Date();
+  const isTrial = plan === "trial";
 
-  let isTrialExpired = false;
-  if (plan === "trial" && ws.trial_ends_at) {
-    isTrialExpired = now.getTime() > new Date(ws.trial_ends_at).getTime();
-  }
+  // -----------------------------------------------------------------------
+  // Determine the usage window
+  // -----------------------------------------------------------------------
+  // Trial: measure from workspace creation_at through trial_ends_at.
+  //        Only usage records WHERE plan IS NULL OR plan = 'trial' are counted.
+  // Paid:  measure strictly within current_period_start .. current_period_end
+  //        as set by the payment activation (never from calendar months).
+  //        If the period has rolled over but the DB hasn't been updated yet,
+  //        advance the window deterministically without counting old records.
 
-  // Determine usage window:
-  // For trial workspaces: usage is measured over the lifetime of the trial (from workspace creation)
-  // For active monthly plans: usage is measured for the current UTC calendar month
   let periodStart: string;
-  if (plan === "trial") {
-    periodStart = ws.created_at || new Date(now.getTime() - 14 * 86400000).toISOString();
-  } else {
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  let periodEnd: string | null = null;
+
+  // Handle period rollover for paid plans: if we're past current_period_end,
+  // the new period is implicitly in effect even if renewal hasn't been processed.
+  let effectivePeriodStart = ws.current_period_start;
+  let effectivePeriodEnd = ws.current_period_end;
+
+  if (!isTrial && effectivePeriodEnd && now > new Date(effectivePeriodEnd)) {
+    // Roll the period forward by 30-day increments until now is within window
+    let ps = new Date(ws.current_period_start ?? ws.created_at!);
+    let pe = new Date(effectivePeriodEnd);
+    while (now >= pe) {
+      ps = pe;
+      pe = new Date(pe.getTime() + 30 * 86400000);
+    }
+    effectivePeriodStart = ps.toISOString();
+    effectivePeriodEnd = pe.toISOString();
   }
 
-  const { data: usageRecords, error: usageErr } = await supabase
+  if (isTrial) {
+    periodStart = ws.created_at || new Date(now.getTime() - 14 * 86400000).toISOString();
+    periodEnd = ws.trial_ends_at || null;
+  } else {
+    periodStart =
+      effectivePeriodStart ||
+      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    periodEnd = effectivePeriodEnd || null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Query usage records for the current window
+  // -----------------------------------------------------------------------
+  let usageQuery = supabase
     .from("usage_records")
     .select("units")
     .eq("workspace_id", workspaceId)
     .eq("operation", "tender_analysis")
     .gte("created_at", periodStart);
+
+  if (periodEnd) {
+    usageQuery = usageQuery.lt("created_at", periodEnd);
+  }
+
+  // For paid plans: exclude records tagged as trial to prevent bleed-over
+  if (!isTrial) {
+    usageQuery = usageQuery.not("plan", "eq", "trial");
+  }
+
+  const { data: usageRecords, error: usageErr } = await usageQuery;
 
   if (usageErr) {
     console.error("[Entitlements] Failed to fetch usage records:", usageErr.message);
@@ -69,7 +122,13 @@ export async function getWorkspaceBillingContext(
   let canAnalyze = true;
   let blockReason: WorkspaceBillingContext["blockReason"] = null;
 
-  if (plan === "trial") {
+  // Trial expiry check
+  let isTrialExpired = false;
+  if (isTrial && ws.trial_ends_at) {
+    isTrialExpired = now.getTime() > new Date(ws.trial_ends_at).getTime();
+  }
+
+  if (isTrial) {
     if (isTrialExpired) {
       canAnalyze = false;
       blockReason = "TRIAL_EXPIRED";
@@ -87,6 +146,19 @@ export async function getWorkspaceBillingContext(
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Countdown text
+  // -----------------------------------------------------------------------
+  let countdown = "";
+  if (isTrial && periodEnd) {
+    countdown = countdownText(new Date(periodEnd).getTime() - now.getTime(), "Trial ends");
+  } else if (!isTrial && (effectivePeriodEnd || ws.renewal_date)) {
+    const end = effectivePeriodEnd || ws.renewal_date;
+    countdown = countdownText(new Date(end!).getTime() - now.getTime(), "Renews");
+  } else {
+    countdown = "Subscription active";
+  }
+
   return {
     workspaceId,
     plan,
@@ -94,12 +166,18 @@ export async function getWorkspaceBillingContext(
     subscriptionStatus,
     trialEndsAt: ws.trial_ends_at,
     isTrialExpired,
+    isTrial,
     analysesUsed,
     analysesAllowance: allowance,
     remainingAnalyses,
     canAnalyze,
     blockReason,
     periodStart,
+    periodEnd,
+    currentPeriodStart: effectivePeriodStart,
+    currentPeriodEnd: effectivePeriodEnd,
+    renewalDate: ws.renewal_date,
+    countdownText: countdown,
   };
 }
 
@@ -120,23 +198,16 @@ export async function canAnalyzeTender(
       message =
         "Your subscription is inactive or past due. Please update payment to resume tender analysis.";
     }
-    return {
-      allowed: false,
-      reason: message,
-      context,
-    };
+    return { allowed: false, reason: message, context };
   }
 
-  return {
-    allowed: true,
-    context,
-  };
+  return { allowed: true, context };
 }
 
 /**
  * Idempotently records a billable analysis execution.
- * If a record for this opportunityId and workspace already exists within the current billing period,
- * no duplicate usage record is inserted.
+ * Tags the record with the current plan and billing period so it can
+ * be accurately filtered during entitlement checks.
  */
 export async function recordAnalysisUsage(
   supabase: Client,
@@ -144,7 +215,7 @@ export async function recordAnalysisUsage(
   opportunityId: string,
   actorId?: string | null,
 ): Promise<{ recorded: boolean; reason?: string }> {
-  // Check for existing usage record for this specific resource to maintain strict idempotency
+  // Strict idempotency — one record per opportunity per workspace
   const { data: existing } = await supabase
     .from("usage_records")
     .select("id")
@@ -157,12 +228,34 @@ export async function recordAnalysisUsage(
     return { recorded: false, reason: "ALREADY_METERED" };
   }
 
+  // Get current period info for tagging
+  let currentPeriodStart: string | null = null;
+  let currentPeriodEnd: string | null = null;
+  let currentPlan: string = "trial";
+  try {
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("plan, current_period_start, current_period_end")
+      .eq("id", workspaceId)
+      .single();
+    if (ws) {
+      currentPlan = ws.plan || "trial";
+      currentPeriodStart = ws.current_period_start;
+      currentPeriodEnd = ws.current_period_end;
+    }
+  } catch {
+    // non-fatal; just tag as trial
+  }
+
   const { error: insertErr } = await supabase.from("usage_records").insert({
     workspace_id: workspaceId,
     actor_id: actorId ?? null,
     operation: "tender_analysis",
     resource_id: opportunityId,
     units: 1,
+    plan: currentPlan,
+    period_start: currentPeriodStart,
+    period_end: currentPeriodEnd,
     metadata: {
       timestamp: new Date().toISOString(),
       opportunity_id: opportunityId,
@@ -174,7 +267,7 @@ export async function recordAnalysisUsage(
     throw new Error(`Failed to record analysis usage: ${insertErr.message}`);
   }
 
-  // Also log to activity_logs for audit trail
+  // Audit trail
   try {
     await supabase.from("activity_logs").insert({
       workspace_id: workspaceId,
@@ -182,10 +275,7 @@ export async function recordAnalysisUsage(
       action: "tender_analyzed",
       resource_type: "opportunity",
       resource_id: opportunityId,
-      metadata: {
-        operation: "tender_analysis",
-        units: 1,
-      },
+      metadata: { operation: "tender_analysis", units: 1, plan: currentPlan },
     });
   } catch (logErr) {
     console.warn("[Entitlements] Could not write activity log:", logErr);

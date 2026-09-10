@@ -9,8 +9,8 @@ import { unzipSync, strFromU8 } from "fflate";
 export type ExtractResult = {
   ok: boolean;
   text: string;
-  pageCount?: number;
-  reason?: string;
+  pageCount?: number | undefined;
+  reason?: string | undefined;
 };
 
 const MAX_TEXT = 900_000;
@@ -47,6 +47,70 @@ export const SUPPORTED_EXTENSIONS = [
   "zip",
 ];
 
+async function ocrPdfWithGemini(bytes: Uint8Array): Promise<ExtractResult> {
+  const apiKey = process.env["GEMINI_API_KEY"];
+  if (!apiKey) {
+    return {
+      ok: false,
+      text: "",
+      reason:
+        "This document appears to be scanned. OCR is not configured for this workspace. Please set GEMINI_API_KEY to enable OCR on scanned PDFs.",
+    };
+  }
+
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    const client = new GoogleGenAI({ apiKey });
+    const base64 = Buffer.from(bytes).toString("base64");
+
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: base64,
+              },
+            },
+            {
+              text: `You are an expert document transcription system. Transcribe ALL text from this PDF exactly as it appears, preserving structure. Start each page with a [[page N]] marker (e.g. [[page 1]], [[page 2]]). Preserve headings, bullet points, tables, and lists. Do not summarize or interpret — transcribe verbatim. Return only the transcribed text, nothing else.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const text = response.text ?? "";
+    if (!text || text.trim().length < 20) {
+      return {
+        ok: false,
+        text: "",
+        reason: "Gemini OCR returned empty content. The document may be image-only or encrypted.",
+      };
+    }
+
+    // Estimate page count from page markers
+    const pageMatches = text.match(/\[\[page \d+\]\]/g);
+    const pageCount = pageMatches ? pageMatches.length : undefined;
+
+    return {
+      ok: true,
+      text: text.slice(0, MAX_TEXT),
+      pageCount,
+      reason: undefined,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      text: "",
+      reason: `OCR failed: ${(e as Error).message}`,
+    };
+  }
+}
+
 async function extractPdf(bytes: Uint8Array): Promise<ExtractResult> {
   try {
     const { extractText, getDocumentProxy } = await import("unpdf");
@@ -59,19 +123,21 @@ async function extractPdf(bytes: Uint8Array): Promise<ExtractResult> {
       .trim();
     const stripped = merged.replace(/\[\[page \d+\]\]/g, "").trim();
     if (stripped.length < 40) {
-      return {
-        ok: false,
-        text: "",
-        pageCount: totalPages,
-        reason:
-          "This PDF has no extractable text layer (it looks scanned). OCR is not configured, so its content could not be read.",
-      };
+      // Scanned PDF — attempt Gemini multimodal OCR
+      console.log(`[Extract] PDF text layer insufficient (${stripped.length} chars). Attempting OCR fallback.`);
+      const ocrResult = await ocrPdfWithGemini(bytes);
+      if (!ocrResult.ok) {
+        // Return OCR-specific error but attach page count
+        return { ...ocrResult, pageCount: totalPages };
+      }
+      return { ...ocrResult, pageCount: ocrResult.pageCount ?? totalPages };
     }
     return { ok: true, text: merged.slice(0, MAX_TEXT), pageCount: totalPages };
   } catch (e) {
     return { ok: false, text: "", reason: `PDF could not be parsed: ${(e as Error).message}` };
   }
 }
+
 
 function extractDocx(bytes: Uint8Array): ExtractResult {
   try {

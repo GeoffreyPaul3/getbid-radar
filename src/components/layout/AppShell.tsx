@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -17,6 +17,10 @@ import {
   FileSearch,
   PanelLeftClose,
   PanelLeft,
+  BarChart3,
+  Bell,
+  Search,
+  CheckCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -33,6 +37,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/bidradar.png";
+import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
+import { getUnreadNotificationsFn, markAllReadFn } from "@/lib/notifications/notifications.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type NotificationRecord = Database["public"]["Tables"]["notifications"]["Row"];
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -44,6 +53,9 @@ export function AppShell({ children }: AppShellProps) {
     useWorkspace();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     try {
@@ -66,6 +78,39 @@ export function AppShell({ children }: AppShellProps) {
     });
   };
 
+  // Keyboard shortcut: Cmd+K / Ctrl+K opens search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Load notifications
+  useEffect(() => {
+    if (!workspace?.id) return;
+    getUnreadNotificationsFn({ data: { workspaceId: workspace.id } })
+      .then((data) => {
+        setNotifications(data ?? []);
+        setUnreadCount((data ?? []).length);
+      })
+      .catch(() => {});
+  }, [workspace?.id]);
+
+  const markAllRead = useCallback(() => {
+    if (!workspace?.id) return;
+    markAllReadFn({ data: { workspaceId: workspace.id } })
+      .then(() => {
+        setNotifications([]);
+        setUnreadCount(0);
+      })
+      .catch(() => {});
+  }, [workspace?.id]);
+
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
 
@@ -87,6 +132,12 @@ export function AppShell({ children }: AppShellProps) {
       href: "/knowledge",
       icon: BookOpen,
       active: currentPath.startsWith("/knowledge"),
+    },
+    {
+      label: "Analytics",
+      href: "/analytics",
+      icon: BarChart3,
+      active: currentPath.startsWith("/analytics"),
     },
   ];
 
@@ -445,8 +496,66 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </aside>
 
+        {/* Search Dialog — rendered at root level */}
+        <GlobalSearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+
         {/* Main Content Area */}
         <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
+          {/* Desktop Top Bar — Search + Notifications */}
+          <div className="hidden md:flex h-12 items-center justify-end gap-2 px-5 border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-10">
+            {/* Search trigger */}
+            <button
+              id="global-search-trigger"
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-muted-foreground text-xs hover:text-foreground hover:border-primary/40 transition-colors"
+              aria-label="Search (⌘K)"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search…</span>
+              <kbd className="ml-1 px-1 py-0.5 rounded border border-border bg-surface text-[10px] font-mono">⌘K</kbd>
+            </button>
+
+            {/* Notification Bell */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  id="notifications-bell"
+                  className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-muted text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                  aria-label="Notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <DropdownMenuLabel className="p-0 text-xs font-semibold">Notifications</DropdownMenuLabel>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                      <CheckCheck className="h-3 w-3" />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                <DropdownMenuSeparator />
+                {notifications.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">No new notifications</div>
+                ) : (
+                  notifications.slice(0, 8).map((n) => (
+                    <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 cursor-pointer py-2.5">
+                      <span className="text-xs font-medium text-foreground">{n.title}</span>
+                      {n.body && <span className="text-[11px] text-muted-foreground line-clamp-2">{n.body}</span>}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           {/* Mobile Header */}
           <header className="flex md:hidden h-14 items-center justify-between px-4 border-b border-border bg-surface sticky top-0 z-30">
             <Link to="/dashboard" className="flex items-center gap-2">

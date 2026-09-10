@@ -69,7 +69,7 @@ import {
   removeMemberFn,
   revokeInvitationFn,
 } from "@/lib/members/members.functions";
-import type { WorkspaceMemberRecord, AppRole } from "@/lib/members/members.server";
+import type { WorkspaceMemberRecord, AppRole } from "@/lib/members/members.types";
 import { CurrencyCombobox } from "@/components/ui/currency-combobox";
 
 export const Route = createFileRoute("/settings")({

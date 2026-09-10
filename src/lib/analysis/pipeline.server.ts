@@ -136,6 +136,7 @@ const CATEGORY_TO_REQ_TYPE: Record<
   commercial: "commercial",
   delivery: "delivery",
   timeline: "delivery",
+  deadline: "delivery",
   documentation: "documentation",
   compliance: "legal",
   other: "technical",

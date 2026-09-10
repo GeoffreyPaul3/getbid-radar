@@ -185,22 +185,31 @@ function BillingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Monthly Allowance
+                  {currentPlan === "trial" ? "Trial Allowance" : "Subscription Allowance"}
                 </span>
                 <div className="font-display text-xl font-bold text-foreground">
                   {currentPlanConfig.analysisAllowance === -1
                     ? "Unlimited"
-                    : `${currentPlanConfig.analysisAllowance} analyses/mo`}
+                    : `${currentPlanConfig.analysisAllowance} ${currentPlan === "trial" ? "analyses total" : "analyses/period"}`}
                 </div>
-                <p className="text-xs text-muted-foreground">Tender analyses per month</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentPlan === "trial"
+                    ? "Evaluation quota"
+                    : "Server-authoritative period allowance"}
+                </p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Utilized This Month
+                  Utilized This Period
                 </span>
                 <div className="font-display text-xl font-bold text-foreground">
                   {billingContext?.analysesUsed ?? 0}
+                  {currentPlanConfig.analysisAllowance !== -1 && (
+                    <span className="text-xs font-mono text-muted-foreground font-normal ml-1">
+                      / {currentPlanConfig.analysisAllowance}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {billingContext?.analysesAllowance === -1
@@ -211,21 +220,38 @@ function BillingPage() {
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Renewal / Expiry
+                  {currentPlan === "trial" ? "Trial Expiration" : "Period Renewal"}
                 </span>
                 <div className="font-display text-xl font-bold text-foreground">
-                  {workspace?.trial_ends_at
-                    ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : "Active Period"}
+                  {billingContext?.countdownText ||
+                    (currentPlan === "trial"
+                      ? workspace?.trial_ends_at
+                        ? new Date(workspace.trial_ends_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "14-day evaluation"
+                      : billingContext?.renewalDate || billingContext?.currentPeriodEnd
+                        ? new Date(
+                            (billingContext.renewalDate || billingContext.currentPeriodEnd)!,
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Active Period")}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {billingContext?.isTrialExpired
                     ? "Trial period ended. Upgrade required."
-                    : "Server-authoritative billing window"}
+                    : currentPlan === "trial"
+                      ? "14-day commercial evaluation"
+                      : `Cycle ends ${
+                          billingContext?.currentPeriodEnd
+                            ? new Date(billingContext.currentPeriodEnd).toLocaleDateString()
+                            : "on renewal"
+                        }`}
                 </p>
               </div>
             </div>

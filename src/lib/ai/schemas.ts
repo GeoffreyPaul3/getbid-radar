@@ -18,6 +18,7 @@ export const REQUIREMENT_CATEGORIES = [
   "commercial",
   "delivery",
   "timeline",
+  "deadline",
   "documentation",
   "compliance",
   "other",
@@ -40,6 +41,16 @@ export const MATCH_VERDICTS = ["match", "partial", "no_match", "unknown"] as con
 export type MatchVerdict = (typeof MATCH_VERDICTS)[number];
 export const RISK_LEVELS = ["low", "medium", "high"] as const;
 
+/** Normalise a confidence value: if > 1 it is treated as a percentage (85 → 0.85) */
+const normaliseConfidence = z.preprocess(
+  (v) => {
+    const n = Number(v);
+    if (isNaN(n)) return 0;
+    return n > 1 ? n / 100 : n;
+  },
+  z.number().min(0).max(1),
+);
+
 export const extractedRequirementSchema = z.object({
   title: z.string().min(3).max(300),
   description: z.string().max(2000).default(""),
@@ -57,7 +68,7 @@ export const extractedRequirementSchema = z.object({
   threshold_value: z.string().max(200).nullable(),
   evidence_needed: z.string().max(600).nullable(),
   is_ambiguous: z.boolean(),
-  confidence: z.number().min(0).max(1),
+  confidence: normaliseConfidence,
 });
 export type ExtractedRequirement = z.infer<typeof extractedRequirementSchema>;
 
@@ -71,7 +82,7 @@ export type RequirementExtraction = z.infer<typeof requirementExtractionSchema>;
 export const requirementMatchSchema = z.object({
   requirement_ref: z.string().min(1),
   verdict: z.enum(MATCH_VERDICTS),
-  confidence: z.number().min(0).max(1),
+  confidence: normaliseConfidence,
   risk: z.enum(RISK_LEVELS),
   reasoning: z.string().max(1200),
   /** Evidence ids taken verbatim from the supplied company evidence list. */
@@ -91,7 +102,7 @@ export type CompanyMatching = z.infer<typeof companyMatchingSchema>;
  */
 export const assessmentComponentSchema = z.object({
   score: z.number().min(0).max(100),
-  confidence: z.number().min(0).max(1),
+  confidence: normaliseConfidence,
   rationale: z.string().max(800),
 });
 
