@@ -1098,7 +1098,7 @@ function SettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
                         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                           Active Plan
@@ -1126,17 +1126,36 @@ function SettingsPage() {
 
                       <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
                         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                          Analysis Allowance
+                          Pursuit Allowance
                         </span>
                         <div className="font-display text-lg font-bold text-foreground">
-                          {billingContext?.analysesAllowance === -1
-                            ? "Unlimited"
-                            : `${billingContext?.analysesUsed ?? 0} / ${billingContext?.analysesAllowance ?? 3}`}
+                          {billingContext?.opportunitiesAllowance === -1
+                            ? "Custom"
+                            : `${billingContext?.opportunitiesUsed ?? 0} / ${billingContext?.opportunitiesAllowance ?? 3}`}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {billingContext?.analysesAllowance === -1
-                            ? "Continuous AI qualification pipeline"
-                            : `${billingContext?.remainingAnalyses ?? 0} analyses remaining this period`}
+                          {billingContext?.opportunitiesAllowance === -1
+                            ? "Tailored enterprise volume"
+                            : `${billingContext?.remainingOpportunities ?? 0} pursuits remaining`}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-border/60 bg-surface/40 space-y-1.5">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                          Team Seats
+                        </span>
+                        <div className="font-display text-lg font-bold text-foreground">
+                          {billingContext?.memberSeatsUsed ?? 1}
+                          {billingContext?.memberSeatsAllowance !== -1 && (
+                            <span className="text-xs font-mono text-muted-foreground font-normal ml-1">
+                              / {billingContext?.memberSeatsAllowance ?? 1}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {billingContext?.memberSeatsAllowance === -1
+                            ? "Unlimited team collaborators"
+                            : "Active & invited seats"}
                         </p>
                       </div>
 
@@ -1156,7 +1175,7 @@ function SettingsPage() {
                         <p className="text-xs text-muted-foreground">
                           {billingContext?.isTrialExpired
                             ? "Evaluation period ended. Paid upgrade required."
-                            : "Server-authoritative billing entitlement"}
+                            : billingContext?.countdownText || "Server-authoritative entitlement"}
                         </p>
                       </div>
                     </div>
@@ -1164,12 +1183,12 @@ function SettingsPage() {
                     <div className="p-4 rounded-xl border border-border/60 bg-card space-y-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-medium text-foreground">
-                          Monthly Capacity Utilization
+                          Monthly Pursuit Capacity Utilization
                         </span>
                         <span className="font-mono text-muted-foreground">
-                          {billingContext?.analysesAllowance === -1
-                            ? "Unlimited Allocation"
-                            : `${Math.round(((billingContext?.analysesUsed ?? 0) / Math.max(1, billingContext?.analysesAllowance ?? 3)) * 100)}% Used`}
+                          {billingContext?.opportunitiesAllowance === -1
+                            ? "Custom Allocation"
+                            : `${Math.round(((billingContext?.opportunitiesUsed ?? 0) / Math.max(1, billingContext?.opportunitiesAllowance ?? 3)) * 100)}% Used`}
                         </span>
                       </div>
                       <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
@@ -1177,9 +1196,9 @@ function SettingsPage() {
                           className="bg-accent h-full transition-all duration-300 rounded-full"
                           style={{
                             width:
-                              billingContext?.analysesAllowance === -1
+                              billingContext?.opportunitiesAllowance === -1
                                 ? "100%"
-                                : `${Math.min(100, Math.round(((billingContext?.analysesUsed ?? 0) / Math.max(1, billingContext?.analysesAllowance ?? 3)) * 100))}%`,
+                                : `${Math.min(100, Math.round(((billingContext?.opportunitiesUsed ?? 0) / Math.max(1, billingContext?.opportunitiesAllowance ?? 3)) * 100))}%`,
                           }}
                         />
                       </div>
@@ -1191,7 +1210,7 @@ function SettingsPage() {
                           Upgrade or Switch Commercial Plan
                         </h4>
                         <p className="text-xs text-muted-foreground">
-                          Upgrade to Growth or Pro Enterprise with instant checkout.
+                          Upgrade to Growth (Recommended) or Pro with instant activation.
                         </p>
                       </div>
                       <Button

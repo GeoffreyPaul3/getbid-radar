@@ -115,9 +115,28 @@ export async function getWorkspaceBillingContext(
     0,
   );
 
-  const allowance = planConfig.analysisAllowance;
+  const allowance = planConfig.opportunityAllowance ?? planConfig.analysisAllowance;
   const isUnlimited = allowance === -1;
   const remainingAnalyses = isUnlimited ? null : Math.max(0, allowance - analysesUsed);
+
+  // Measure seat utilization for the workspace (active members + pending invitations)
+  let memberSeatsUsed = 1;
+  try {
+    const [{ count: activeCount }, { count: pendingCount }] = await Promise.all([
+      supabase
+        .from("workspace_members")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId),
+      supabase
+        .from("workspace_invitations")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending"),
+    ]);
+    memberSeatsUsed = (activeCount ?? 0) + (pendingCount ?? 0);
+  } catch (err) {
+    console.warn("[Entitlements] Error counting workspace members:", err);
+  }
 
   let canAnalyze = true;
   let blockReason: WorkspaceBillingContext["blockReason"] = null;
@@ -167,9 +186,14 @@ export async function getWorkspaceBillingContext(
     trialEndsAt: ws.trial_ends_at,
     isTrialExpired,
     isTrial,
+    opportunitiesUsed: analysesUsed,
+    opportunitiesAllowance: allowance,
+    remainingOpportunities: remainingAnalyses,
     analysesUsed,
     analysesAllowance: allowance,
     remainingAnalyses,
+    memberSeatsUsed,
+    memberSeatsAllowance: planConfig.memberAllowance,
     canAnalyze,
     blockReason,
     periodStart,
@@ -184,19 +208,39 @@ export async function getWorkspaceBillingContext(
 export async function canAnalyzeTender(
   supabase: Client,
   workspaceId: string,
+  opportunityId?: string,
 ): Promise<{ allowed: boolean; reason?: string; context: WorkspaceBillingContext }> {
+  // 1. One opportunity = one tender pursuit.
+  // If opportunityId is provided, check if this tender was already metered.
+  // Retries, re-evaluations, and downstream actions on the same pursuit do NOT
+  // consume additional opportunities or get blocked when monthly quota is reached.
+  if (opportunityId) {
+    const { data: existingUsage } = await supabase
+      .from("usage_records")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("operation", "tender_analysis")
+      .eq("resource_id", opportunityId)
+      .limit(1);
+
+    if (existingUsage && existingUsage.length > 0) {
+      const context = await getWorkspaceBillingContext(supabase, workspaceId);
+      return { allowed: true, context };
+    }
+  }
+
   const context = await getWorkspaceBillingContext(supabase, workspaceId);
 
   if (!context.canAnalyze) {
-    let message = "Analysis limit reached. Upgrade to continue.";
+    let message = "Opportunity pursuit limit reached. Upgrade to continue.";
     if (context.blockReason === "TRIAL_EXPIRED") {
       message =
-        "Your 14-day evaluation has expired. Please select a commercial plan to continue qualifying tenders.";
+        "Your 14-day evaluation pilot has expired. Please select a commercial plan to continue qualifying tenders.";
     } else if (context.blockReason === "ALLOWANCE_EXCEEDED") {
-      message = `You have utilized all ${context.analysesAllowance} analyses included in your ${context.planConfig.name} plan for this billing period. Upgrade your plan for additional capacity.`;
+      message = `You have utilized all ${context.opportunitiesAllowance} monthly opportunity pursuits included in your ${context.planConfig.name} plan for this billing period. Upgrade your plan for additional pursuit capacity.`;
     } else if (context.blockReason === "SUBSCRIPTION_INACTIVE") {
       message =
-        "Your subscription is inactive or past due. Please update payment to resume tender analysis.";
+        "Your subscription is inactive or past due. Please update payment to resume tender qualification.";
     }
     return { allowed: false, reason: message, context };
   }

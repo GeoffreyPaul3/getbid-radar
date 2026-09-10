@@ -110,7 +110,7 @@ export async function initiatePayChanguCheckout(
     tx_ref: txRef,
     customization: {
       title: `GetBidRadar ${planConfig.name}`,
-      description: `${planConfig.analysisAllowance === -1 ? "Unlimited" : planConfig.analysisAllowance} analyses/month plan subscription`,
+      description: `${planConfig.opportunityAllowance} opportunities/month & ${planConfig.memberAllowance} team seats subscription`,
     },
   };
 

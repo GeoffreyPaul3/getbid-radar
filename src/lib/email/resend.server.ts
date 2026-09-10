@@ -25,8 +25,48 @@ function getResendApiKey(): string | null {
   return key && key.trim() !== "" ? key.trim() : null;
 }
 
+/** Canonical verified sender on the active production domain */
+const RESEND_FALLBACK_FROM = "GetBidRadar <onboarding@getbidradar.com>";
+
+/** RFC 5322 "Name <email>" or bare "email" validator */
+function isValidFromAddress(value: string): boolean {
+  const bareEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const namedEmail = /^[^<>]+<[^\s@]+@[^\s@]+\.[^\s@]+>$/;
+  return bareEmail.test(value) || namedEmail.test(value);
+}
+
+function sanitizeFromAddress(raw: string): string {
+  // Remove wrapping quotes e.g. "GetBidRadar <foo@bar.com>" -> GetBidRadar <foo@bar.com>
+  let cleaned = raw.trim().replace(/^["']+|["']+$/g, "").trim();
+
+  // If unclosed bracket at end e.g. "GetBidRadar <onboarding@getbidradar.com"
+  if (cleaned.includes("<") && !cleaned.includes(">")) {
+    cleaned = `${cleaned}>`;
+  }
+
+  // If bare email e.g. "onboarding@getbidradar.com", wrap in display name
+  const bareEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (bareEmail.test(cleaned)) {
+    return `GetBidRadar <${cleaned}>`;
+  }
+
+  if (isValidFromAddress(cleaned)) {
+    return cleaned;
+  }
+
+  console.warn(
+    `[Resend] RESEND_FROM_EMAIL="${raw}" is invalid. Defaulting to verified sender "${RESEND_FALLBACK_FROM}".`,
+  );
+  return RESEND_FALLBACK_FROM;
+}
+
 function getFromAddress(): string {
-  return process.env["RESEND_FROM_EMAIL"] || "GetBidRadar <onboarding@getbidradar.com>";
+  ensureServerEnv();
+  const configured = process.env["RESEND_FROM_EMAIL"];
+  if (configured && configured.trim() !== "") {
+    return sanitizeFromAddress(configured);
+  }
+  return RESEND_FALLBACK_FROM;
 }
 
 async function sendViaResend(params: {
@@ -148,7 +188,7 @@ export async function sendPaymentConfirmedEmail(params: {
 
   const appUrl = getAppUrl();
   const subject = `Payment Confirmed: Your GetBidRadar ${planConfig.name} Plan is Active`;
-  const text = `Hello ${params.name},\n\nThank you for your payment of ${formattedAmount}. Your ${planConfig.name} plan is now active on GetBidRadar.\n\nTransaction Reference: ${params.txRef}\nCapacity: ${planConfig.analysisAllowance === -1 ? "Unlimited" : planConfig.analysisAllowance} analyses per month\n\nAccess your dashboard: ${appUrl}/tenders\n\nThe GetBidRadar Team`;
+  const text = `Hello ${params.name},\n\nThank you for your payment of ${formattedAmount}. Your ${planConfig.name} plan is now active on GetBidRadar.\n\nTransaction Reference: ${params.txRef}\nCapacity: ${planConfig.opportunityAllowance} opportunities per month & ${planConfig.memberAllowance} team seats\n\nAccess your dashboard: ${appUrl}/tenders\n\nThe GetBidRadar Team`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
@@ -176,7 +216,7 @@ export async function sendPaymentConfirmedEmail(params: {
           </tr>
           <tr>
             <td style="padding: 8px 0; color: #667085;">Monthly Capacity:</td>
-            <td style="padding: 8px 0; font-weight: 600; text-align: right;">${planConfig.analysisAllowance === -1 ? "Unlimited" : `${planConfig.analysisAllowance} analyses/mo`}</td>
+            <td style="padding: 8px 0; font-weight: 600; text-align: right;">${planConfig.opportunityAllowance} pursuits/mo (${planConfig.memberAllowance} seats)</td>
           </tr>
         </table>
         <div style="margin: 28px 0;">

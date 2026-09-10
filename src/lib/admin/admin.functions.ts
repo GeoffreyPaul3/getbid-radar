@@ -90,6 +90,7 @@ export const getAdminOverviewMetricsFn = createServerFn({ method: "POST" })
       starter: 0,
       growth: 0,
       pro: 0,
+      enterprise: 0,
     };
 
     let activeTrials = 0;

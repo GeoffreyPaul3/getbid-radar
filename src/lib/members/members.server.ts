@@ -159,6 +159,38 @@ export async function inviteWorkspaceMember(
   }
   const cleanName = fullName.trim() || normalizedEmail.split("@")[0]!;
 
+  // 2.5. Enforce seat limit from workspace subscription plan
+  const { data: wsData } = await supabase
+    .from("workspaces")
+    .select("plan")
+    .eq("id", workspaceId)
+    .single();
+
+  const currentPlan = wsData?.plan || "trial";
+  const { getPlanConfig, isPlanTier } = await import("../billing/plans");
+  const planConfig = getPlanConfig(isPlanTier(currentPlan) ? currentPlan : "trial");
+
+  if (planConfig.memberAllowance !== -1) {
+    const [{ count: activeCount }, { count: pendingCount }] = await Promise.all([
+      supabase
+        .from("workspace_members")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId),
+      supabase
+        .from("workspace_invitations")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending"),
+    ]);
+
+    const totalSeats = (activeCount ?? 0) + (pendingCount ?? 0);
+    if (totalSeats >= planConfig.memberAllowance) {
+      throw new Error(
+        `Seat limit reached: Your ${planConfig.name} plan includes up to ${planConfig.memberAllowance} team seats. Upgrade your plan to invite additional collaborators.`,
+      );
+    }
+  }
+
   // 3. Check if an account already exists with this email
   const { data: existingProfile } = await supabase
     .from("profiles")

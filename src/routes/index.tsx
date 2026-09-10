@@ -46,6 +46,16 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "GetBidRadar | Know Which Contracts Are Worth Pursuing" },
+      {
+        name: "description",
+        content:
+          "GetBidRadar analyzes tender requirements against your company's actual capabilities and evidence to help you make a defensible BID, REVIEW, or NO-BID decision — before investing hours in a proposal.",
+      },
+    ],
+  }),
   component: LandingPage,
 });
 
@@ -53,6 +63,18 @@ function LandingPage() {
   const { user } = useAuth();
   const { workspace } = useWorkspace();
   const [currency, setCurrency] = useState<BillingCurrency>("USD");
+
+  // ROI Calculator state
+  const [roiTenders, setRoiTenders] = useState(8);
+  const [roiPeople, setRoiPeople] = useState(3);
+  const [roiHours, setRoiHours] = useState(12);
+  const [roiRate, setRoiRate] = useState(45);
+  const [roiWaste, setRoiWaste] = useState(40);
+
+  const monthlyHours = roiTenders * roiPeople * roiHours;
+  const monthlyLaborCost = monthlyHours * roiRate;
+  const wastedCost = Math.round(monthlyLaborCost * (roiWaste / 100));
+  const annualWastedCost = wastedCost * 12;
 
   return (
     <PublicLayout>
@@ -312,120 +334,240 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works Narrative */}
+      {/* ROI Calculator Section */}
+      <section id="roi" className="py-16 sm:py-24 border-t border-border bg-surface">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-canvas text-muted-foreground text-xs font-mono uppercase tracking-wider mb-4">
+              ROI Calculator
+            </div>
+            <h2 className="font-display font-bold text-2xl sm:text-4xl text-foreground tracking-tight mb-4">
+              What does your current bid process actually cost?
+            </h2>
+            <p className="text-base text-text-secondary">
+              Estimate the hours and money your team spends qualifying and pursuing opportunities —
+              including the ones that turn out to be a poor fit.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+            {/* Inputs */}
+            <div className="lg:col-span-3 bg-canvas rounded-2xl border border-border p-6 sm:p-8 space-y-6">
+              <h3 className="font-display font-semibold text-base text-foreground">Your current process</h3>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">Tenders evaluated per month</label>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">{roiTenders}</span>
+                </div>
+                <input
+                  type="range" min={1} max={30} step={1}
+                  value={roiTenders}
+                  onChange={(e) => setRoiTenders(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full accent-primary cursor-pointer"
+                  aria-label="Tenders evaluated per month"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>1</span><span>30</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">People involved per evaluation</label>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">{roiPeople}</span>
+                </div>
+                <input
+                  type="range" min={1} max={10} step={1}
+                  value={roiPeople}
+                  onChange={(e) => setRoiPeople(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full accent-primary cursor-pointer"
+                  aria-label="People involved per evaluation"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>1</span><span>10</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">Average hours per person per evaluation</label>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">{roiHours}h</span>
+                </div>
+                <input
+                  type="range" min={2} max={40} step={1}
+                  value={roiHours}
+                  onChange={(e) => setRoiHours(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full accent-primary cursor-pointer"
+                  aria-label="Average hours per person per evaluation"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>2h</span><span>40h</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">Avg. hourly labor cost (USD)</label>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">${roiRate}/hr</span>
+                </div>
+                <input
+                  type="range" min={15} max={200} step={5}
+                  value={roiRate}
+                  onChange={(e) => setRoiRate(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full accent-primary cursor-pointer"
+                  aria-label="Average hourly labor cost"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>$15</span><span>$200</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">Opportunities eventually abandoned or disqualified (%)</label>
+                  <span className="text-xs font-mono font-bold text-nobid bg-nobid-soft px-2 py-0.5 rounded">{roiWaste}%</span>
+                </div>
+                <input
+                  type="range" min={10} max={80} step={5}
+                  value={roiWaste}
+                  onChange={(e) => setRoiWaste(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full accent-primary cursor-pointer"
+                  aria-label="Percentage of opportunities abandoned"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                  <span>10%</span><span>80%</span>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground font-mono italic">
+                * Estimates only. Assumptions visible above. Does not represent guaranteed savings.
+              </p>
+            </div>
+
+            {/* Results */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="p-5 rounded-2xl border border-border bg-canvas">
+                <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">Monthly bid evaluation effort</p>
+                <p className="font-display font-extrabold text-3xl text-foreground">{monthlyHours.toLocaleString()}h</p>
+                <p className="text-xs text-text-secondary mt-1">{roiTenders} tenders × {roiPeople} people × {roiHours}h</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-border bg-canvas">
+                <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">Monthly labor cost</p>
+                <p className="font-display font-extrabold text-3xl text-foreground">${monthlyLaborCost.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-1">{monthlyHours.toLocaleString()}h × ${roiRate}/hr</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-nobid/30 bg-nobid-soft/30">
+                <p className="text-xs font-mono text-nobid uppercase tracking-wider mb-1">Estimated wasted pursuit effort / month</p>
+                <p className="font-display font-extrabold text-3xl text-nobid">${wastedCost.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-1">{roiWaste}% of opportunities abandoned after significant effort</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-primary/20 bg-primary-soft/30">
+                <p className="text-xs font-mono text-primary uppercase tracking-wider mb-1">Potential annual exposure</p>
+                <p className="font-display font-extrabold text-3xl text-primary">${annualWastedCost.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-1">Estimated potential savings from earlier qualification decisions</p>
+              </div>
+
+              <Link
+                to="/login"
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-bright shadow-sm transition-all"
+              >
+                Start Qualifying Earlier
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Narrative — 7-step full lifecycle */}
       <section id="how-it-works" className="py-16 sm:py-24 border-t border-border bg-canvas">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-surface text-muted-foreground text-xs font-mono uppercase tracking-wider mb-4">
-              Intelligence Flow
+              The Full Workflow
             </div>
             <h2 className="font-display font-bold text-2xl sm:text-4xl text-foreground tracking-tight mb-4">
-              The four stages of contract qualification.
+              From tender document to lessons learned.
             </h2>
             <p className="text-base text-text-secondary">
-              A systematic pipeline connecting raw documents to confident pursuit decisions.
+              One connected system covering the entire bid lifecycle — so your team never starts from scratch.
             </p>
           </div>
 
-          <div className="relative max-w-6xl mx-auto">
-            {/* Desktop connecting progression line */}
-            <div className="hidden lg:block absolute top-1/2 left-8 right-8 h-0.5 bg-gradient-to-r from-primary/30 via-accent/30 to-bid/40 -translate-y-6 -z-0" />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-              {/* Stage 01 */}
-              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative z-10">
+            {[
+              {
+                step: "01",
+                title: "Add Tender",
+                desc: "Upload a PDF, Word document, or paste a public RFP URL. Works on large multi-page tenders and scanned documents.",
+                io: "Input: PDF / DOCX / URL",
+                color: "text-primary bg-primary-soft",
+              },
+              {
+                step: "02",
+                title: "Understand Requirements",
+                desc: "Extract mandatory clauses, eligibility criteria, technical specifications, deadlines, and financial requirements into a structured register.",
+                io: "Output: Requirement register",
+                color: "text-primary bg-primary-soft",
+              },
+              {
+                step: "03",
+                title: "Match Your Evidence",
+                desc: "Compare extracted requirements against your company's verified certifications, track record, team qualifications, and financial capacity.",
+                io: "Source: Company knowledge base",
+                color: "text-purple-700 bg-purple-500/10",
+              },
+              {
+                step: "04",
+                title: "Make the Decision",
+                desc: "Receive a BID, REVIEW, or NO-BID recommendation backed by an eight-factor qualification score, evidence citations, and identified gaps.",
+                io: "Verdict: BID / REVIEW / NO-BID",
+                color: "text-bid bg-bid-soft",
+              },
+              {
+                step: "05",
+                title: "Build the Proposal",
+                desc: "Turn qualified requirements into executable bid tasks. Assign sections, track readiness, and keep the proposal organized from day one.",
+                io: "Output: Proposal workspace",
+                color: "text-primary bg-primary-soft",
+              },
+              {
+                step: "06",
+                title: "Audit Compliance",
+                desc: "Before submission, run a compliance check against mandatory clauses. Catch gaps while there's still time to address them.",
+                io: "Check: Submission readiness",
+                color: "text-review bg-review-soft",
+              },
+              {
+                step: "07",
+                title: "Submit & Track",
+                desc: "Log your submission, track status, and record the outcome. Whether you win or lose, every result improves future decisions.",
+                io: "Outcome: Win / Loss / Withdrawn",
+                color: "text-emerald-700 bg-emerald-500/10",
+              },
+            ].map((stage) => (
+              <div
+                key={stage.step}
+                className="p-5 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
-                      01
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${stage.color}`}>
+                      {stage.step}
                     </span>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                      <FileText className="h-4.5 w-4.5" />
-                    </div>
                   </div>
-                  <h3 className="font-display font-bold text-lg text-foreground mb-2">Add Tender</h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    Upload tender PDF/DOCX or provide a public URL. Ingests large multi-page tenders into secure isolated storage.
-                  </p>
+                  <h3 className="font-display font-bold text-base text-foreground mb-2">{stage.title}</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">{stage.desc}</p>
                 </div>
-                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
-                  <span>Input: PDF / DOCX / URL</span>
-                  <span className="text-primary font-bold">→</span>
+                <div className="mt-5 pt-4 border-t border-border/60 text-[10px] font-mono text-muted-foreground">
+                  {stage.io}
                 </div>
               </div>
-
-              {/* Stage 02 */}
-              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
-                      02
-                    </span>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
-                      <CheckSquare className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                    Extract Requirements
-                  </h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    Extract mandatory conditions, deadlines, technical specifications, and evaluation criteria into a structured register.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
-                  <span>Output: Clause Matrix</span>
-                  <span className="text-primary font-bold">→</span>
-                </div>
-              </div>
-
-              {/* Stage 03 */}
-              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
-                      03
-                    </span>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600">
-                      <ShieldCheck className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                    Match Evidence
-                  </h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    Match requirements against verified company evidence: ISO certs, track records, key personnel, and financial capacity.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
-                  <span>Audit: Knowledge Base</span>
-                  <span className="text-primary font-bold">→</span>
-                </div>
-              </div>
-
-              {/* Stage 04 */}
-              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold text-bid bg-bid-soft px-2 py-0.5 rounded">
-                      04
-                    </span>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-bid-soft text-bid">
-                      <Trophy className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                    Decision Report
-                  </h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    Produce BID, REVIEW, or NO-BID with mathematical scoring, identified blockers, evidence citations, and next actions.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-bid font-bold">
-                  <span>Verdict: BID / REVIEW / NO-BID</span>
-                  <span>✓</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -618,7 +760,7 @@ function LandingPage() {
                   {isPopular && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                       <span className="px-3.5 py-1 rounded-full bg-primary text-white text-[11px] font-mono font-semibold uppercase tracking-wider shadow-sm">
-                        Most Popular
+                        Recommended
                       </span>
                     </div>
                   )}
@@ -642,11 +784,12 @@ function LandingPage() {
                           / month
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground font-mono mt-1">
-                        {plan.analysisAllowance === -1
-                          ? "Unlimited tender evaluations"
-                          : `${plan.analysisAllowance} tender evaluations / mo`}
-                      </p>
+                      <div className="flex flex-col gap-0.5 mt-2 text-[11px] text-muted-foreground font-mono">
+                        <span className="text-foreground font-semibold">
+                          {plan.opportunityAllowance} tender pursuits / month
+                        </span>
+                        <span>{plan.memberAllowance} workspace team seats</span>
+                      </div>
                     </div>
 
                     <ul className="space-y-3 mb-8 flex-1 text-xs">
@@ -677,14 +820,38 @@ function LandingPage() {
             })}
           </div>
 
+          {/* Enterprise Custom Architecture Card */}
+          <div className="mt-8 p-6 sm:p-8 rounded-2xl border border-primary/30 bg-surface shadow-subtle flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <h4 className="font-display font-bold text-lg text-foreground">
+                  {PLAN_CONFIGS.enterprise.name}
+                </h4>
+                <span className="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[10px] font-mono font-bold uppercase">
+                  Custom Architecture
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                {PLAN_CONFIGS.enterprise.description} Includes custom monthly pursuits (150+), unlimited seats with SSO, bespoke scoring rubrics, multi-subsidiary federation, and 99.9% SLA.
+              </p>
+            </div>
+            <Link
+              to="/contact"
+              className="inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:bg-surface-muted shrink-0 transition-all"
+            >
+              <span>Contact Enterprise Advisory</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
           {/* Evaluation Callout Banner */}
-          <div className="mt-12 p-6 rounded-2xl border border-primary/20 bg-primary-soft/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div className="mt-8 p-6 rounded-2xl border border-primary/20 bg-primary-soft/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
             <div className="space-y-1">
               <h4 className="font-display font-bold text-sm text-foreground">
                 Evaluating for an enterprise bid team?
               </h4>
               <p className="text-xs text-text-secondary">
-                Every new workspace includes a 14-day commercial pilot with 3 full tender qualifications and evidence cross-referencing.
+                Every new workspace includes a 14-day commercial pilot with 3 live tender qualifications and evidence cross-referencing.
               </p>
             </div>
             <Link
@@ -755,7 +922,7 @@ function LandingPage() {
                 Which payment methods and currencies do you support?
               </AccordionTrigger>
               <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
-                Through our integration with PayChangu, we accept major credit and debit cards, mobile money transfers (Airtel Money, Mpamba), and direct bank transfers. We natively support Malawian Kwacha (MWK) and US Dollars (USD).
+                We support major credit and debit cards, mobile money transfers, and bank transfers depending on your region. We natively support US Dollars (USD) and local currencies for supported markets. Contact us if you need payment details for your specific region.
               </AccordionContent>
             </AccordionItem>
 

@@ -52,6 +52,12 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 Pricing
               </a>
               <Link
+                to="/security"
+                className={`transition-colors hover:text-foreground ${currentPath === "/security" ? "text-foreground font-semibold" : ""}`}
+              >
+                Security
+              </Link>
+              <Link
                 to="/about"
                 className={`transition-colors hover:text-foreground ${currentPath === "/about" ? "text-foreground font-semibold" : ""}`}
               >
@@ -205,11 +211,11 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 <img src={logo} width={130} height={120} alt="BidRadar"/>
               </Link>
               <p className="text-xs text-text-secondary leading-relaxed max-w-sm">
-                GetBidRadar is the enterprise contract intelligence engine. We extract mandatory requirements, match verified corporate qualifications, and deliver deterministic BID / REVIEW / NO-BID decisions with zero hallucinations.
+                GetBidRadar helps companies decide which contracts are worth pursuing, verify they qualify, prepare competitive bids, and learn from every outcome.
               </p>
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-primary/20 bg-primary-soft text-[11px] font-mono font-medium text-primary">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Deterministic Scoring Engine v2.0</span>
+                <span>Private · Isolated · Evidence-Backed</span>
               </div>
             </div>
 
@@ -279,9 +285,14 @@ export function PublicLayout({ children }: PublicLayoutProps) {
             {/* Col 3: Legal & Trust */}
             <div className="space-y-3">
               <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider font-mono">
-                Legal & Privacy
+                Legal & Trust
               </h4>
               <ul className="space-y-2">
+                <li>
+                  <Link to="/security" className="hover:text-foreground transition-colors">
+                    Security
+                  </Link>
+                </li>
                 <li>
                   <Link to="/terms" className="hover:text-foreground transition-colors">
                     Terms of Service
@@ -293,14 +304,9 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                   </Link>
                 </li>
                 <li>
-                  <span className="text-muted-foreground/80">
-                    Malawi & International GDPR-Compliant
-                  </span>
-                </li>
-                <li>
-                  <span className="text-muted-foreground/80">
-                    Strict Multi-Tenant RLS
-                  </span>
+                  <Link to="/contact" className="hover:text-foreground transition-colors">
+                    Contact
+                  </Link>
                 </li>
               </ul>
             </div>

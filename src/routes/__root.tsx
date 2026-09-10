@@ -80,16 +80,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=5" },
-      { title: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine" },
+      { title: "GetBidRadar | Know Which Contracts Are Worth Pursuing" },
       {
         name: "description",
         content:
-          "AI-powered tender intelligence, automated requirement extraction, evidence-based bid/no-bid qualification scoring, and verified company evidence retrieval.",
+          "GetBidRadar analyzes tender requirements against your company's actual capabilities, identifies qualification gaps, and gives your team a defensible BID / REVIEW / NO-BID decision before you invest hours in a proposal.",
       },
       {
         name: "keywords",
         content:
-          "tender management, bid no bid engine, RFP analysis, procurement intelligence, tender qualification, AI bid proposal, government tenders",
+          "tender qualification, bid no bid, RFP analysis, procurement intelligence, tender requirements, bid readiness, government contracts, competitive tendering",
       },
       { name: "author", content: "GetBidRadar" },
       { name: "application-name", content: "GetBidRadar" },
@@ -100,23 +100,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "GetBidRadar" },
       {
         property: "og:title",
-        content: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine",
+        content: "GetBidRadar | Know Which Contracts Are Worth Pursuing",
       },
       {
         property: "og:description",
         content:
-          "Automate tender analysis, extract mandatory requirements in seconds, match against your corporate knowledge base, and receive evidence-based bid/no-bid recommendations.",
+          "AI-powered bid intelligence that analyzes tender requirements against your company evidence, identifies gaps, and delivers a defensible BID / REVIEW / NO-BID decision.",
       },
       { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:title",
-        content: "GetBidRadar — Enterprise AI Tender Intelligence & Bid Decision Engine",
+        content: "GetBidRadar | Know Which Contracts Are Worth Pursuing",
       },
       {
         name: "twitter:description",
         content:
-          "Automate tender analysis, extract mandatory requirements in seconds, and receive evidence-based bid/no-bid recommendations backed by verified evidence.",
+          "Analyze tender requirements against your company evidence, identify qualification gaps, and make defensible pursue decisions — before committing your bid team.",
       },
     ],
     links: [
@@ -131,7 +131,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "canonical", href: "https://getbid-radar.vercel.app" },
+      { rel: "canonical", href: "https://www.getbidradar.com" },
     ],
   }),
   shellComponent: RootShell,

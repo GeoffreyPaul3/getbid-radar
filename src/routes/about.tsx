@@ -17,6 +17,16 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
+  head: () => ({
+    meta: [
+      { title: "About GetBidRadar | Procurement Bid Intelligence Platform" },
+      {
+        name: "description",
+        content:
+          "GetBidRadar was built to replace guesswork in procurement with evidence-backed bid decisions. Learn about our mission, philosophy, and how we help companies pursue the right contracts.",
+      },
+    ],
+  }),
   component: AboutPage,
 });
 
@@ -86,7 +96,7 @@ function AboutPage() {
                 <div className="flex items-start gap-3 text-sm">
                   <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <strong className="text-foreground">Zero Prompt-Leakage Architecture:</strong> Isolated multi-tenant databases with strict cryptographic tenant separation.
+                    <strong className="text-foreground">Evidence-backed decisions:</strong> Every qualification verdict links back to the exact tender clause and the company evidence that was — or wasn't — present.
                   </div>
                 </div>
               </div>
@@ -98,8 +108,8 @@ function AboutPage() {
                   <Target className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">The GetBidRadar Core Engine</h3>
-                  <p className="text-xs text-muted-foreground font-mono">Zero-Hallucination Pipeline</p>
+                  <h3 className="text-base font-bold text-foreground">How GetBidRadar Works</h3>
+                  <p className="text-xs text-muted-foreground font-mono">Evidence-backed qualification pipeline</p>
                 </div>
               </div>
 
@@ -107,7 +117,7 @@ function AboutPage() {
                 <div className="p-3.5 rounded-lg border border-border bg-surface-muted/40">
                   <div className="flex items-center justify-between font-semibold text-foreground mb-1">
                     <span>1. Autonomous Extraction</span>
-                    <span className="font-mono text-primary text-[11px]">Server AI</span>
+                    <span className="font-mono text-primary text-[11px]">Server-side AI</span>
                   </div>
                   <p className="text-muted-foreground">
                     Deep OCR and structural parsing extract mandatory qualifications, deadlines, and evaluation weightings.
@@ -117,7 +127,7 @@ function AboutPage() {
                 <div className="p-3.5 rounded-lg border border-border bg-surface-muted/40">
                   <div className="flex items-center justify-between font-semibold text-foreground mb-1">
                     <span>2. Evidence Cross-Referencing</span>
-                    <span className="font-mono text-primary text-[11px]">RLS Database</span>
+                    <span className="font-mono text-primary text-[11px]">Private database</span>
                   </div>
                   <p className="text-muted-foreground">
                     Direct comparison against verified corporate certificates, employee CVs, and balance sheets.
@@ -127,7 +137,7 @@ function AboutPage() {
                 <div className="p-3.5 rounded-lg border border-border bg-surface-muted/40">
                   <div className="flex items-center justify-between font-semibold text-foreground mb-1">
                     <span>3. Deterministic Decision</span>
-                    <span className="font-mono text-primary text-[11px]">Sole Authority</span>
+                    <span className="font-mono text-primary text-[11px]">Scoring engine</span>
                   </div>
                   <p className="text-muted-foreground">
                     Rule-based scoring engine produces an immutable BID, REVIEW, or NO-BID decision matrix.
@@ -192,7 +202,7 @@ function AboutPage() {
             Stop Guessing. Bid with Certainty.
           </h2>
           <p className="text-sm sm:text-base text-text-secondary max-w-xl mx-auto leading-relaxed">
-            Join enterprise contractors, NGOs, engineering firms, and consultancies leveraging GetBidRadar for procurement dominance.
+            Join engineering firms, consultancies, NGOs, and procurement teams that need to spend their time on contracts they can actually win.
           </p>
           <div className="pt-2">
             <Link

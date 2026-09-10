@@ -55,22 +55,12 @@ function BillingPage() {
   const { companyProfile, role } = useWorkspace();
   const navigate = useNavigate();
 
-  // Selected currency (defaults to MWK if Malawi, otherwise USD)
-  const defaultCurrency: BillingCurrency = companyProfile?.country?.toLowerCase().includes("malawi")
-    ? "MWK"
-    : "USD";
-
-  const [currency, setCurrency] = useState<BillingCurrency>(defaultCurrency);
+  // Selected currency (defaults to USD-first international presentation)
+  const [currency, setCurrency] = useState<BillingCurrency>("USD");
   const [billingContext, setBillingContext] = useState<WorkspaceBillingContext | null>(null);
   const [transactions, setTransactions] = useState<BillingTransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<PlanTier | null>(null);
-
-  useEffect(() => {
-    if (companyProfile?.country?.toLowerCase().includes("malawi")) {
-      setCurrency("MWK");
-    }
-  }, [companyProfile?.country]);
 
   const loadData = useCallback(async () => {
     if (!workspace) return;
@@ -98,7 +88,7 @@ function BillingPage() {
     if (!workspace) return;
     setProcessingPlan(plan);
     try {
-      toast.info(`Preparing secure PayChangu checkout for ${PLAN_CONFIGS[plan].name}...`);
+      toast.info(`Preparing secure checkout for ${PLAN_CONFIGS[plan].name}...`);
       const res = await initiateCheckoutFn({
         data: {
           workspaceId: workspace.id,
@@ -154,7 +144,7 @@ function BillingPage() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {c === "MWK" ? "MWK (Malawi)" : "USD (International)"}
+                {c === "USD" ? "USD ($)" : "MWK (Malawi)"}
               </button>
             ))}
           </div>
@@ -190,36 +180,39 @@ function BillingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  {currentPlan === "trial" ? "Trial Allowance" : "Subscription Allowance"}
+                  {currentPlan === "trial" ? "Trial Pursuit Allowance" : "Pursuit Allowance"}
                 </span>
                 <div className="font-display text-xl font-bold text-foreground">
-                  {currentPlanConfig.analysisAllowance === -1
-                    ? "Unlimited"
-                    : `${currentPlanConfig.analysisAllowance} ${currentPlan === "trial" ? "analyses total" : "analyses/period"}`}
+                  {billingContext?.opportunitiesUsed ?? 0}
+                  {currentPlanConfig.opportunityAllowance !== -1 && (
+                    <span className="text-xs font-mono text-muted-foreground font-normal ml-1">
+                      / {currentPlanConfig.opportunityAllowance}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {currentPlan === "trial"
-                    ? "Evaluation quota"
-                    : "Server-authoritative period allowance"}
+                  {currentPlanConfig.opportunityAllowance === -1
+                    ? "Custom enterprise volume"
+                    : `${billingContext?.remainingOpportunities ?? 0} pursuits remaining`}
                 </p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-border/60 bg-surface/40 space-y-1">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Utilized This Period
+                  Team Seats
                 </span>
                 <div className="font-display text-xl font-bold text-foreground">
-                  {billingContext?.analysesUsed ?? 0}
-                  {currentPlanConfig.analysisAllowance !== -1 && (
+                  {billingContext?.memberSeatsUsed ?? 1}
+                  {currentPlanConfig.memberAllowance !== -1 && (
                     <span className="text-xs font-mono text-muted-foreground font-normal ml-1">
-                      / {currentPlanConfig.analysisAllowance}
+                      / {currentPlanConfig.memberAllowance}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {billingContext?.analysesAllowance === -1
-                    ? "Unmetered volume"
-                    : `${billingContext?.remainingAnalyses ?? 0} analyses remaining`}
+                  {currentPlanConfig.memberAllowance === -1
+                    ? "Unlimited workspace collaborators"
+                    : "Active & invited team seats"}
                 </p>
               </div>
 
@@ -279,7 +272,7 @@ function BillingPage() {
                   </p>
                   <p className="text-muted-foreground">
                     GetBidRadar does not offer a permanent free plan. Select a commercial plan below
-                    to unlock regular monthly capacity and keep your team active.
+                    to unlock regular monthly pursuit capacity and keep your team active.
                   </p>
                 </div>
               </div>
@@ -288,13 +281,13 @@ function BillingPage() {
         </Card>
 
         {/* Plan Selection Grid */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="text-center md:text-left space-y-1">
             <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
               Commercial Qualification Tiers
             </h2>
             <p className="text-xs text-muted-foreground">
-              Instant activation.
+              Deterministic procurement intelligence for tender pursuit teams. Instant activation.
             </p>
           </div>
 
@@ -336,11 +329,12 @@ function BillingPage() {
                         </span>
                         <span className="text-xs text-muted-foreground font-medium">/ month</span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground font-mono mt-1">
-                        {plan.analysisAllowance === -1
-                          ? "Unlimited qualification pipeline"
-                          : `${plan.analysisAllowance} tender qualifications per month`}
-                      </p>
+                      <div className="flex flex-col gap-0.5 mt-2 text-[11px] text-muted-foreground font-mono">
+                        <span className="text-foreground font-semibold">
+                          {plan.opportunityAllowance} tender pursuits / month
+                        </span>
+                        <span>{plan.memberAllowance} workspace team seats</span>
+                      </div>
                     </div>
                   </CardHeader>
 
@@ -387,6 +381,49 @@ function BillingPage() {
                 </Card>
               );
             })}
+          </div>
+
+          {/* Enterprise / Custom Plan Card */}
+          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-card to-primary/5 p-6 sm:p-8 shadow-panel flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="font-display text-lg font-bold text-foreground">
+                  {PLAN_CONFIGS.enterprise.name}
+                </span>
+                <Badge className="bg-primary/15 text-primary border border-primary/30 text-[10px] uppercase font-mono font-bold">
+                  Custom Architecture
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {PLAN_CONFIGS.enterprise.description} Designed for high-volume government contractors, multi-subsidiary corporations, and dedicated bidding divisions.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 pt-2 text-xs text-muted-foreground font-mono">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  Custom pursuit volume (150+/mo)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  Custom & unlimited team seats
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  Bespoke scoring rubrics & tuning
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  Dedicated onboarding & 99.9% SLA
+                </span>
+              </div>
+            </div>
+            <Button
+              asChild
+              className="bg-secondary text-foreground hover:bg-secondary/80 border border-border/80 font-semibold text-xs py-5 px-6 shrink-0"
+            >
+              <Link to="/contact">
+                Contact Enterprise Advisory →
+              </Link>
+            </Button>
           </div>
         </div>
 

@@ -206,7 +206,7 @@ const buildDb = (overrides: Record<string, FakeRow[]> = {}) => {
     workspace_members: [
       { id: MEM_RECORD_ID, workspace_id: WS_ID, user_id: CALLER_ID, role: "owner" },
     ],
-    workspaces: [{ id: WS_ID, name: "Test Workspace" }],
+    workspaces: [{ id: WS_ID, name: "Test Workspace", plan: "growth" }],
     profiles: [],
     workspace_invitations: [],
     ...overrides,
@@ -308,7 +308,7 @@ describe("inviteWorkspaceMember", () => {
       workspace_members: [
         { id: MEM_RECORD_ID, workspace_id: WS_ID, user_id: CALLER_ID, role: "owner" },
       ],
-      workspaces: [{ id: WS_ID, name: "Test Workspace" }],
+      workspaces: [{ id: WS_ID, name: "Test Workspace", plan: "growth" }],
       profiles: [
         { id: EXISTING_USER_ID, email: "existing@example.com", full_name: "Existing User" },
       ],
@@ -337,7 +337,7 @@ describe("inviteWorkspaceMember", () => {
         { id: MEM_RECORD_ID, workspace_id: WS_ID, user_id: CALLER_ID, role: "owner" },
         { id: "mem-existing", workspace_id: WS_ID, user_id: EXISTING_USER_ID, role: "member" },
       ],
-      workspaces: [{ id: WS_ID, name: "Test Workspace" }],
+      workspaces: [{ id: WS_ID, name: "Test Workspace", plan: "growth" }],
       profiles: [
         { id: EXISTING_USER_ID, email: "existing@example.com", full_name: "Existing User" },
       ],
@@ -353,6 +353,28 @@ describe("inviteWorkspaceMember", () => {
         role: "viewer",
       }),
     ).rejects.toThrow("already an active member");
+  });
+
+  it("enforces plan seat limits when inviting new members", async () => {
+    // 1-seat trial workspace with 1 existing member
+    const db = new MembersTestDb({
+      workspace_members: [
+        { id: MEM_RECORD_ID, workspace_id: WS_ID, user_id: CALLER_ID, role: "owner" },
+      ],
+      workspaces: [{ id: WS_ID, name: "Trial Workspace", plan: "trial" }],
+      profiles: [],
+      workspace_invitations: [],
+    });
+
+    await expect(
+      inviteWorkspaceMember(db.client(), {
+        workspaceId: WS_ID,
+        callerUserId: CALLER_ID,
+        email: "excess@example.com",
+        fullName: "Excess User",
+        role: "member",
+      }),
+    ).rejects.toThrow("Seat limit reached");
   });
 
   it("never generates or includes passwords in invitation", async () => {

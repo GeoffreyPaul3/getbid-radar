@@ -4,6 +4,16 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import { ShieldCheck, Lock, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/privacy")({
+  head: () => ({
+    meta: [
+      { title: "Privacy Policy | GetBidRadar" },
+      {
+        name: "description",
+        content:
+          "GetBidRadar privacy policy: how we collect, use, and protect your personal and company data. Full documentation of our data practices.",
+      },
+    ],
+  }),
   component: PrivacyPage,
 });
 

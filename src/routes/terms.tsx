@@ -4,6 +4,16 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import { ShieldCheck, FileText, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/terms")({
+  head: () => ({
+    meta: [
+      { title: "Terms of Service | GetBidRadar" },
+      {
+        name: "description",
+        content:
+          "GetBidRadar terms of service: your rights and obligations when using the platform, subscription terms, data commitments, and acceptable use.",
+      },
+    ],
+  }),
   component: TermsPage,
 });
 

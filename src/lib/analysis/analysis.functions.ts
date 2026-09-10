@@ -28,9 +28,13 @@ export const analyzeOpportunity = createServerFn({ method: "POST" })
 
     const { canAnalyzeTender, recordAnalysisUsage } =
       await import("../billing/entitlements.server");
-    const { allowed, reason } = await canAnalyzeTender(context.supabase, opp.workspace_id);
+    const { allowed, reason } = await canAnalyzeTender(
+      context.supabase,
+      opp.workspace_id,
+      data.opportunityId,
+    );
     if (!allowed) {
-      throw new Error(reason || "Tender analysis entitlement exceeded. Please upgrade your plan.");
+      throw new Error(reason || "Tender qualification entitlement exceeded. Please upgrade your plan.");
     }
 
     const { runOpportunityAnalysis } = await import("./pipeline.server");
