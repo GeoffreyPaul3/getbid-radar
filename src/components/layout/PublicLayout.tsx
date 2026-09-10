@@ -34,12 +34,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 Home
               </Link>
               <a
-                href="/#ecosystem"
-                className="transition-colors hover:text-foreground"
-              >
-                Platform
-              </a>
-              <a
                 href="/#how-it-works"
                 className="transition-colors hover:text-foreground"
               >
