@@ -67,8 +67,8 @@ function BillingConfirmPage() {
         return;
       }
 
-      // Wait until workspace context finishes loading
-      if (workspaceLoading) {
+      // Defer until auth + workspace context has resolved
+      if (!isReady) {
         return;
       }
 
@@ -117,7 +117,7 @@ function BillingConfirmPage() {
         setVerifying(false);
       }
     },
-    [txRef, workspace, allWorkspaces, workspaceLoading, refetchWorkspace],
+    [txRef, workspace, allWorkspaces, isReady, refetchWorkspace],
   );
 
   useEffect(() => {

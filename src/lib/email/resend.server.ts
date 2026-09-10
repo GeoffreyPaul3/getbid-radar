@@ -8,6 +8,11 @@ import { ensureServerEnv } from "../server-env";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
+/** Canonical site origin, resolved once per process from APP_URL env var. */
+function getAppUrl(): string {
+  return process.env["APP_URL"] || "https://getbidradar.com";
+}
+
 interface SendEmailResult {
   success: boolean;
   messageId?: string | undefined;
@@ -94,8 +99,9 @@ export async function sendWelcomeTrialEmail(params: {
     year: "numeric",
   });
 
+  const appUrl = getAppUrl();
   const subject = "Welcome to GetBidRadar — Your 14-Day Bid Intelligence Pilot";
-  const text = `Hello ${params.name},\n\nWelcome to GetBidRadar. Your workspace evaluation is active through ${formattedDate}.\n\nYou have 3 complimentary tender qualifications to test our deterministic scoring engine against your company's actual past performance evidence.\n\nSign in to analyze your first tender:\nhttps://getbidradar.com/tenders/new\n\nThe GetBidRadar Team`;
+  const text = `Hello ${params.name},\n\nWelcome to GetBidRadar. Your workspace evaluation is active through ${formattedDate}.\n\nYou have 3 complimentary tender qualifications to test our deterministic scoring engine against your company's actual past performance evidence.\n\nSign in to analyze your first tender:\n${appUrl}/tenders/new\n\nThe GetBidRadar Team`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
@@ -112,7 +118,7 @@ export async function sendWelcomeTrialEmail(params: {
           GetBidRadar uses deterministic scoring to ensure you only commit resources to tenders where your technical capability and past evidence give you an unfair advantage.
         </p>
         <div style="margin: 28px 0;">
-          <a href="https://getbidradar.com/tenders/new" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+          <a href="${appUrl}/tenders/new" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
             Analyze Your First Tender →
           </a>
         </div>
@@ -140,8 +146,9 @@ export async function sendPaymentConfirmedEmail(params: {
   const planConfig = getPlanConfig(params.plan);
   const formattedAmount = formatBillingAmount(params.amount, params.currency);
 
+  const appUrl = getAppUrl();
   const subject = `Payment Confirmed: Your GetBidRadar ${planConfig.name} Plan is Active`;
-  const text = `Hello ${params.name},\n\nThank you for your payment of ${formattedAmount}. Your ${planConfig.name} plan is now active on GetBidRadar.\n\nTransaction Reference: ${params.txRef}\nCapacity: ${planConfig.analysisAllowance === -1 ? "Unlimited" : planConfig.analysisAllowance} analyses per month\n\nAccess your dashboard: https://getbidradar.com/dashboard\n\nThe GetBidRadar Team`;
+  const text = `Hello ${params.name},\n\nThank you for your payment of ${formattedAmount}. Your ${planConfig.name} plan is now active on GetBidRadar.\n\nTransaction Reference: ${params.txRef}\nCapacity: ${planConfig.analysisAllowance === -1 ? "Unlimited" : planConfig.analysisAllowance} analyses per month\n\nAccess your dashboard: ${appUrl}/tenders\n\nThe GetBidRadar Team`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
@@ -173,7 +180,7 @@ export async function sendPaymentConfirmedEmail(params: {
           </tr>
         </table>
         <div style="margin: 28px 0;">
-          <a href="https://getbidradar.com/dashboard" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+          <a href="${appUrl}/tenders" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
             Open Executive Dashboard →
           </a>
         </div>
@@ -199,7 +206,7 @@ export async function sendMemberInvitationEmail(params: {
   role: string;
   setupUrl?: string | undefined;
 }): Promise<SendEmailResult> {
-  const appUrl = process.env["APP_URL"] || "https://getbidradar.com";
+  const appUrl = getAppUrl();
   const setupUrl = params.setupUrl || `${appUrl}/login`;
 
   const subject = `You've been invited to join ${params.workspaceName} on GetBidRadar`;

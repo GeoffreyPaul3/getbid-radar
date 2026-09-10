@@ -16,7 +16,9 @@ export function useRequireAuth(options: RequireAuthOptions = { requireWorkspace:
   const location = useLocation();
 
   const requireWorkspace = options.requireWorkspace ?? true;
-  const currentPath = location.pathname + location.search + location.hash;
+  // location.search is a parsed object in TanStack Router — use location.href for the
+  // full serialized path (pathname + "?" + searchStr + hash) safe for redirect params.
+  const currentPath = location.href;
 
   useEffect(() => {
     // 1. Wait for auth initialization to complete
@@ -27,7 +29,7 @@ export function useRequireAuth(options: RequireAuthOptions = { requireWorkspace:
       const safeRedirect = getSafeRedirect(currentPath);
       navigate({
         to: "/login",
-        search: safeRedirect ? { redirect: safeRedirect } : undefined,
+        search: safeRedirect ? { redirect: safeRedirect } : {},
       });
       return;
     }
@@ -38,7 +40,7 @@ export function useRequireAuth(options: RequireAuthOptions = { requireWorkspace:
         const safeRedirect = getSafeRedirect(currentPath);
         navigate({
           to: "/onboarding",
-          search: safeRedirect ? { redirect: safeRedirect } : undefined,
+          search: safeRedirect ? { redirect: safeRedirect } : {},
         });
       }
     }
