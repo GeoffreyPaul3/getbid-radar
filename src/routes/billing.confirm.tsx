@@ -138,7 +138,7 @@ function BillingConfirmPage() {
                   Authorizing Payment with Gateway...
                 </h2>
                 <p className="text-xs text-muted-foreground font-mono">
-                  Performing server-side signature and amount verification with PayChangu.
+                  Performing server-side signature and amount verification.
                 </p>
               </div>
             </div>

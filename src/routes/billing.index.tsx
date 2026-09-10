@@ -294,7 +294,7 @@ function BillingPage() {
               Commercial Qualification Tiers
             </h2>
             <p className="text-xs text-muted-foreground">
-              Instant activation via PayChangu secure card, mobile money, and bank transfer.
+              Instant activation.
             </p>
           </div>
 

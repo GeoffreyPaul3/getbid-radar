@@ -1191,8 +1191,7 @@ function SettingsPage() {
                           Upgrade or Switch Commercial Plan
                         </h4>
                         <p className="text-xs text-muted-foreground">
-                          Upgrade to Growth or Pro Enterprise with instant checkout via PayChangu
-                          (MWK / USD).
+                          Upgrade to Growth or Pro Enterprise with instant checkout.
                         </p>
                       </div>
                       <Button
