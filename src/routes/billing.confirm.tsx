@@ -41,12 +41,13 @@ export const Route = createFileRoute("/billing/confirm")({
   component: BillingConfirmPage,
 });
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 function BillingConfirmPage() {
+  const { isReady, AuthLoadingFallback, workspace } = useRequireAuth();
   const { tx_ref: txRef } = Route.useSearch();
   const {
-    workspace,
     allWorkspaces,
-    isLoading: workspaceLoading,
     refetchWorkspace,
   } = useWorkspace();
   const navigate = useNavigate();
@@ -122,6 +123,8 @@ function BillingConfirmPage() {
   useEffect(() => {
     performVerification();
   }, [performVerification]);
+
+  if (!isReady) return AuthLoadingFallback;
 
   return (
     <AppShell>

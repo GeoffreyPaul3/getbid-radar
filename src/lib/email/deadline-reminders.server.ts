@@ -99,7 +99,7 @@ export async function checkAndSendDeadlineReminders(
       }
     }
 
-    const siteUrl = process.env["VITE_SITE_URL"] || process.env["NEXT_PUBLIC_SITE_URL"] || "https://getbidradar.com";
+    const siteUrl = process.env["APP_URL"] || "https://getbidradar.com";
     const workspaceUrl = `${siteUrl}/tenders/${opp.id}/workspace`;
     const formattedDeadline = deadlineDate.toLocaleDateString("en-US", {
       month: "short",

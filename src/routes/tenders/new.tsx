@@ -24,23 +24,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { ingestTenderUploadFn, ingestTenderUrlFn } from "@/lib/tender-intake.functions";
 import { toast } from "sonner";
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 export const Route = createFileRoute("/tenders/new")({
   component: NewTenderPage,
 });
 
 function NewTenderPage() {
-  const { user, isLoading: authLoading } = useAuth();
-  const { workspace, isLoading: wsLoading } = useWorkspace();
+  const { isReady, AuthLoadingFallback, workspace } = useRequireAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate({
-        to: "/login",
-        search: { redirect: "/tenders/new" },
-      });
-    }
-  }, [authLoading, user, navigate]);
 
   const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
 
@@ -182,21 +174,8 @@ function NewTenderPage() {
     }
   };
 
-  if (authLoading || (!workspace && wsLoading)) {
-    return (
-      <AppShell>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-          <p className="text-xs text-muted-foreground font-mono">
-            Verifying workspace credentials...
-          </p>
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (!user) {
-    return null;
+  if (!isReady) {
+    return AuthLoadingFallback;
   }
 
   return (

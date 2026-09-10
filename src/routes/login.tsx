@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Radar, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import { ShieldCheck, Radar, AlertCircle, ArrowRight, Loader2, ChevronLeft, Layers, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/bidradar.png";
 
@@ -145,50 +145,118 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen bg-surface">
       {/* Left Hero Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary text-primary-foreground flex-col justify-between p-12 relative overflow-hidden">
-        {/* Background Subtle Radar Circles */}
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full border border-white/10 pointer-events-none" />
-        <div className="absolute -bottom-48 -left-48 w-[32rem] h-[32rem] rounded-full border border-white/5 pointer-events-none" />
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#070e1e] via-[#0b172e] to-[#132247] text-white flex-col justify-between p-12 relative overflow-hidden">
+        {/* Subtle background glow rings */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-accent/15 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full border border-white/5 pointer-events-none" />
 
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <img src={logo} width={140} height={110} alt="BidRadar" />
+        {/* Brand Header */}
+        <div className="relative z-10 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3">
+            <img src={logo} width={150} height={118} alt="GetBidRadar" className="brightness-110" />
+          </Link>
+          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 border border-white/10 px-2.5 py-1 rounded-full bg-white/5">
+            Enterprise v2.0
+          </span>
         </div>
 
-        {/* Value Proposition */}
-        <div className="max-w-md space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono uppercase tracking-wider text-accent">
-            <Radar className="h-3.5 w-3.5 animate-spin" /> Deterministic Bid Intelligence
+        {/* Core Value & Capabilities */}
+        <div className="relative z-10 max-w-lg space-y-7 my-auto py-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/20 px-3 py-1 text-xs font-mono tracking-wider text-blue-300 shadow-sm">
+            <Radar className="h-3.5 w-3.5 animate-spin text-blue-400" />
+            <span>Deterministic Tender Qualification Platform</span>
           </div>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight text-white leading-tight">
-            Stop guessing on complex tenders. Bid with certainty.
-          </h1>
-          <p className="text-sm leading-relaxed text-white/80">
-            Extract mandatory RFP requirements in seconds, match against corporate qualifications,
-            and receive explainable BID / REVIEW / NO-BID decisions backed by verified evidence.
-          </p>
 
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs text-white/80 font-mono">
+          <div className="space-y-3">
+            <h1 className="font-display text-3xl xl:text-4xl font-extrabold tracking-tight text-white leading-tight">
+              Stop guessing on complex tenders. Pursue with mathematical certainty.
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-300">
+              Transform unstructured RFP documents into verified requirement matrices, matched evidence,
+              and defensible pursuit decisions in minutes.
+            </p>
+          </div>
+
+          {/* Three Product Pillars */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 shrink-0 mt-0.5">
+                <Layers className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-white font-display">Automated Requirement Extraction</h2>
+                <p className="text-[11px] text-slate-300 leading-relaxed mt-0.5">
+                  Instant breakdown of mandatory criteria, deadlines, evaluation weights, and technical specifications.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-white font-display">Defensible BID / REVIEW / NO-BID</h2>
+                <p className="text-[11px] text-slate-300 leading-relaxed mt-0.5">
+                  100% deterministic decision engine backed by verified corporate capabilities and historical performance.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 shrink-0 mt-0.5">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-white font-display">Complete Bid Command Center</h2>
+                <p className="text-[11px] text-slate-300 leading-relaxed mt-0.5">
+                  Proposal workspace, AI compliance auditor, submission audit trails, and post-award outcome intelligence.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Guarantees */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10 text-[11px] font-mono text-slate-400">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-accent" /> Zero Hallucination
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span>Zero AI Hallucination</span>
             </div>
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-accent" /> Strict Tenant Isolation
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+              <span>Strict Tenant Isolation</span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-xs text-white/60 font-mono">
-          Enterprise Tender Intelligence Engine v2.0
+        <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono">
+          <span>GetBidRadar Enterprise</span>
+          <span>SOC-2 Ready Architecture</span>
         </div>
       </div>
 
       {/* Right Form Container */}
       <div className="flex flex-1 items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md space-y-6">
+          {/* Back to Homepage / Cancel Navigation */}
+          <div className="flex items-center justify-between">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back to Homepage
+            </Link>
+            {rawRedirect && (
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                Protected Route
+              </span>
+            )}
+          </div>
+
           {/* Mobile Brand */}
-          <div className="flex lg:hidden items-center justify-center gap-2 mb-6">
+          <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono font-bold text-sm">
               BR
             </div>

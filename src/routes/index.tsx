@@ -36,6 +36,12 @@ import {
   Check,
   Search,
   FileCheck2,
+  ShieldAlert,
+  Send,
+  Trophy,
+  Briefcase,
+  ListTodo,
+  CheckSquare,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -87,8 +93,44 @@ function LandingPage() {
           </div>
 
           {/* Hero Product UI Composition (Demonstration Mockup) */}
-          <div className="relative max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-border bg-surface shadow-elevated p-4 sm:p-7">
+          <div className="relative max-w-5xl mx-auto group">
+            {/* Ambient decorative glow */}
+            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-primary/30 via-accent/20 to-primary/30 opacity-70 blur-xl transition-all duration-500 group-hover:opacity-100 group-hover:blur-2xl -z-10" />
+
+            <div className="rounded-2xl border border-border/90 bg-surface shadow-elevated p-4 sm:p-7 transition-all duration-300">
+              {/* Product Lifecycle Navigation Strip */}
+              <div className="flex items-center justify-between gap-2 pb-4 mb-5 border-b border-border/70 overflow-x-auto text-[11px] font-mono">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="px-2.5 py-1 rounded-md bg-primary text-white font-bold flex items-center gap-1">
+                    <Search className="h-3 w-3" /> 01 Analyze
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="px-2.5 py-1 rounded-md bg-review-soft text-review font-bold flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> 02 Decide
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="px-2.5 py-1 rounded-md bg-surface-muted text-muted-foreground flex items-center gap-1">
+                    <ListTodo className="h-3 w-3" /> 03 Prepare
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="px-2.5 py-1 rounded-md bg-surface-muted text-muted-foreground flex items-center gap-1">
+                    <ShieldAlert className="h-3 w-3" /> 04 Audit
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="px-2.5 py-1 rounded-md bg-surface-muted text-muted-foreground flex items-center gap-1">
+                    <Send className="h-3 w-3" /> 05 Submit
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="px-2.5 py-1 rounded-md bg-surface-muted text-muted-foreground flex items-center gap-1">
+                    <Trophy className="h-3 w-3" /> 06 Learn
+                  </span>
+                </div>
+                <div className="hidden sm:flex items-center gap-1.5 text-muted-foreground shrink-0">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Deterministic Authority</span>
+                </div>
+              </div>
+
               {/* Product Top Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-border/70">
                 <div className="flex items-center gap-3">
@@ -101,17 +143,17 @@ function LandingPage() {
                         TDR-2026-089
                       </span>
                       <Badge variant="outline" className="text-[10px] font-mono border-border">
-                        Demonstration UI
+                        Illustrative Production Data Model
                       </Badge>
                     </div>
                     <h2 className="text-base sm:text-lg font-display font-bold text-foreground leading-snug">
-                      Enterprise Cyber Defense & SOC Monitoring Services
+                      Enterprise Cyber Defense &amp; SOC Monitoring Services
                     </h2>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-review-soft border border-review/30 text-review text-xs font-mono font-bold">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-review-soft border border-review/30 text-review text-xs font-mono font-bold shadow-xs">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     REVIEW RECOMMENDATION
                   </div>
@@ -284,73 +326,103 @@ function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-mono font-bold text-primary block mb-2">
-                  STAGE 01
-                </span>
-                <h3 className="font-display font-bold text-lg text-foreground mb-2">Add Tender</h3>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  Upload tender PDF/DOCX or provide a public URL to get started.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
-                Upload or Secure URL
-              </div>
-            </div>
+          <div className="relative max-w-6xl mx-auto">
+            {/* Desktop connecting progression line */}
+            <div className="hidden lg:block absolute top-1/2 left-8 right-8 h-0.5 bg-gradient-to-r from-primary/30 via-accent/30 to-bid/40 -translate-y-6 -z-0" />
 
-            <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-mono font-bold text-primary block mb-2">
-                  STAGE 02
-                </span>
-                <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                  Extract Requirements
-                </h3>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  Structured AI models extract every mandatory condition, submission deadline,
-                  technical specification, and evaluation criteria.
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+              {/* Stage 01 */}
+              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
+                      01
+                    </span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                      <FileText className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-foreground mb-2">Add Tender</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    Upload tender PDF/DOCX or provide a public URL. Ingests large multi-page tenders into secure isolated storage.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+                  <span>Input: PDF / DOCX / URL</span>
+                  <span className="text-primary font-bold">→</span>
+                </div>
               </div>
-              <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
-                Validated Extraction
-              </div>
-            </div>
 
-            <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-mono font-bold text-primary block mb-2">
-                  STAGE 03
-                </span>
-                <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                  Match Evidence
-                </h3>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  Requirements are audited against your verified company certifications, past
-                  contracts, key personnel, and capabilities.
-                </p>
+              {/* Stage 02 */}
+              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
+                      02
+                    </span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
+                      <CheckSquare className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
+                    Extract Requirements
+                  </h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    Extract mandatory conditions, deadlines, technical specifications, and evaluation criteria into a structured register.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+                  <span>Output: Clause Matrix</span>
+                  <span className="text-primary font-bold">→</span>
+                </div>
               </div>
-              <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
-                Company Knowledge Base
-              </div>
-            </div>
 
-            <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-mono font-bold text-primary block mb-2">
-                  STAGE 04
-                </span>
-                <h3 className="font-display font-bold text-lg text-foreground mb-2">
-                  Decision Report
-                </h3>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  A scoring engine produces a BID, REVIEW, or NO-BID recommendation with citations,
-                  blockers, and next steps.
-                </p>
+              {/* Stage 03 */}
+              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono font-bold text-primary bg-primary-soft px-2 py-0.5 rounded">
+                      03
+                    </span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600">
+                      <ShieldCheck className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
+                    Match Evidence
+                  </h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    Match requirements against verified company evidence: ISO certs, track records, key personnel, and financial capacity.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+                  <span>Audit: Knowledge Base</span>
+                  <span className="text-primary font-bold">→</span>
+                </div>
               </div>
-              <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-mono text-bid font-bold">
-                Scored Recommendation
+
+              {/* Stage 04 */}
+              <div className="p-6 rounded-2xl border border-border bg-surface shadow-subtle hover:border-primary/40 hover:shadow-card transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono font-bold text-bid bg-bid-soft px-2 py-0.5 rounded">
+                      04
+                    </span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-bid-soft text-bid">
+                      <Trophy className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-foreground mb-2">
+                    Decision Report
+                  </h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    Produce BID, REVIEW, or NO-BID with mathematical scoring, identified blockers, evidence citations, and next actions.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-bid font-bold">
+                  <span>Verdict: BID / REVIEW / NO-BID</span>
+                  <span>✓</span>
+                </div>
               </div>
             </div>
           </div>

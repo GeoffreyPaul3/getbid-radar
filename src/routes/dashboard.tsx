@@ -36,11 +36,14 @@ interface DashboardOpportunity extends Opportunity {
   latest_analysis?: OpportunityAnalysis | null;
 }
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
 function DashboardPage() {
+  const { isReady, AuthLoadingFallback } = useRequireAuth();
   const { workspace, companyProfile, completenessScore } = useWorkspace();
   const [opportunities, setOpportunities] = useState<DashboardOpportunity[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -132,6 +135,10 @@ function DashboardPage() {
       return isReview || hasBlockers || isUrgent;
     })
     .slice(0, 4);
+
+  if (!isReady) {
+    return AuthLoadingFallback;
+  }
 
   return (
     <AppShell>

@@ -46,14 +46,16 @@ type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
 type OpportunityAnalysis = Database["public"]["Tables"]["opportunity_analyses"]["Row"];
 type ScoreComponent = Database["public"]["Tables"]["score_components"]["Row"];
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 export const Route = createFileRoute("/tenders/$id/")({
   component: IntelligenceReportPage,
 });
 
 function IntelligenceReportPage() {
   const { id } = useParams({ from: "/tenders/$id/" });
-  const { user } = useAuth();
-  const { workspace, role } = useWorkspace();
+  const { isReady, AuthLoadingFallback, user, workspace } = useRequireAuth();
+  const { role } = useWorkspace();
 
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [analysis, setAnalysis] = useState<OpportunityAnalysis | null>(null);
@@ -193,6 +195,8 @@ function IntelligenceReportPage() {
       setIsSavingDecision(false);
     }
   };
+
+  if (!isReady) return AuthLoadingFallback;
 
   if (isLoading) {
     return (

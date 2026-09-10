@@ -286,8 +286,7 @@ async function emitSubmissionNotifications(params: {
       .maybeSingle();
 
     if (profile?.email) {
-      const siteUrl =
-        process.env["VITE_SITE_URL"] || process.env["NEXT_PUBLIC_SITE_URL"] || "https://getbidradar.com";
+      const siteUrl = process.env["APP_URL"] || "https://getbidradar.com";
       await sendSubmissionConfirmationEmail({
         to: profile.email,
         tenderTitle,

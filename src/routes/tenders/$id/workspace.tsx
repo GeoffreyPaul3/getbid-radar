@@ -139,10 +139,11 @@ function StatusBadge({ status }: { status: string }) {
 // Main component
 // ─────────────────────────────────────────────────
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 function BidWorkspacePage() {
   const { id } = useParams({ from: "/tenders/$id/workspace" });
-  const { user } = useAuth();
-  const { workspace } = useWorkspace();
+  const { isReady, AuthLoadingFallback, user, workspace } = useRequireAuth();
 
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [bidWorkspace, setBidWorkspace] = useState<BidWorkspace | null>(null);
@@ -399,6 +400,8 @@ function BidWorkspacePage() {
   };
 
   // ──── Loading state ────────────────────────────────────────────
+  if (!isReady) return AuthLoadingFallback;
+
   if (isLoading) {
     return (
       <AppShell>
@@ -476,21 +479,21 @@ function BidWorkspacePage() {
                 onClick={() => setViewMode("list")}
                 className={`flex items-center gap-1.5 px-3 py-2 transition-colors ${
                   viewMode === "list"
-                    ? "bg-accent text-accent-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary text-white font-semibold"
+                    : "bg-surface text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <List className="h-3.5 w-3.5" /> List
+                <List className={`h-3.5 w-3.5 ${viewMode === "list" ? "text-white" : "text-muted-foreground"}`} /> List
               </button>
               <button
                 onClick={() => setViewMode("kanban")}
                 className={`flex items-center gap-1.5 px-3 py-2 transition-colors ${
                   viewMode === "kanban"
-                    ? "bg-accent text-accent-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary text-white font-semibold"
+                    : "bg-surface text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Columns3 className="h-3.5 w-3.5" /> Kanban
+                <Columns3 className={`h-3.5 w-3.5 ${viewMode === "kanban" ? "text-white" : "text-muted-foreground"}`} /> Kanban
               </button>
             </div>
 
@@ -498,9 +501,9 @@ function BidWorkspacePage() {
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold"
+                  className="bg-primary text-white hover:bg-primary/90 font-semibold shadow-sm"
                 >
-                  <PlusCircle className="h-4 w-4 mr-1.5" /> Add Task
+                  <PlusCircle className="h-4 w-4 mr-1.5 text-white" /> Add Task
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -630,61 +633,61 @@ function BidWorkspacePage() {
         </div>
 
         {/* ── Command Center Sub-Tabs ──────────────────────── */}
-        <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-xl border border-border/60 overflow-x-auto text-xs">
+        <div className="flex items-center gap-1 bg-secondary/60 p-1.5 rounded-xl border border-border/60 overflow-x-auto text-xs">
           <button
             onClick={() => setActiveTab("tasks")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition-all shrink-0 ${
               activeTab === "tasks"
-                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
             }`}
           >
-            <ListTodo className="h-3.5 w-3.5 text-accent" />
-            Tasks & Readiness
+            <ListTodo className={`h-3.5 w-3.5 ${activeTab === "tasks" ? "text-white" : "text-primary"}`} />
+            Tasks &amp; Readiness
           </button>
           <button
             onClick={() => setActiveTab("proposal")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition-all shrink-0 ${
               activeTab === "proposal"
-                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
             }`}
           >
-            <FileText className="h-3.5 w-3.5 text-accent" />
+            <FileText className={`h-3.5 w-3.5 ${activeTab === "proposal" ? "text-white" : "text-primary"}`} />
             Proposal Workspace
           </button>
           <button
             onClick={() => setActiveTab("compliance")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition-all shrink-0 ${
               activeTab === "compliance"
-                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
             }`}
           >
-            <ShieldAlert className="h-3.5 w-3.5 text-accent" />
+            <ShieldAlert className={`h-3.5 w-3.5 ${activeTab === "compliance" ? "text-white" : "text-primary"}`} />
             Compliance Auditor
           </button>
           <button
             onClick={() => setActiveTab("submission")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition-all shrink-0 ${
               activeTab === "submission"
-                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
             }`}
           >
-            <Send className="h-3.5 w-3.5 text-accent" />
+            <Send className={`h-3.5 w-3.5 ${activeTab === "submission" ? "text-white" : "text-primary"}`} />
             Submission Tracking
           </button>
           <button
             onClick={() => setActiveTab("outcomes")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-semibold transition-all shrink-0 ${
               activeTab === "outcomes"
-                ? "bg-card text-foreground font-bold shadow-sm border border-border/40"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
             }`}
           >
-            <Trophy className="h-3.5 w-3.5 text-accent" />
-            Outcomes & Debrief
+            <Trophy className={`h-3.5 w-3.5 ${activeTab === "outcomes" ? "text-white" : "text-primary"}`} />
+            Outcomes &amp; Debrief
           </button>
         </div>
 

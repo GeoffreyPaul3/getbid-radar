@@ -33,12 +33,18 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               >
                 Home
               </Link>
-              <Link
-                to="/about"
-                className={`transition-colors hover:text-foreground ${currentPath === "/about" ? "text-foreground font-semibold" : ""}`}
+              <a
+                href="/#ecosystem"
+                className="transition-colors hover:text-foreground"
               >
-                About
-              </Link>
+                Platform
+              </a>
+              <a
+                href="/#how-it-works"
+                className="transition-colors hover:text-foreground"
+              >
+                How It Works
+              </a>
               <a
                 href="/#pricing"
                 className="transition-colors hover:text-foreground"
@@ -46,10 +52,10 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 Pricing
               </a>
               <Link
-                to="/support"
-                className={`transition-colors hover:text-foreground ${currentPath === "/support" ? "text-foreground font-semibold" : ""}`}
+                to="/about"
+                className={`transition-colors hover:text-foreground ${currentPath === "/about" ? "text-foreground font-semibold" : ""}`}
               >
-                Support
+                About
               </Link>
               <Link
                 to="/contact"
@@ -118,6 +124,20 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               >
                 About
               </Link>
+              <a
+                href="/#ecosystem"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-md hover:bg-surface-muted text-text-secondary hover:text-foreground"
+              >
+                Platform
+              </a>
+              <a
+                href="/#how-it-works"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-md hover:bg-surface-muted text-text-secondary hover:text-foreground"
+              >
+                How It Works
+              </a>
               <a
                 href="/#pricing"
                 onClick={() => setMobileMenuOpen(false)}

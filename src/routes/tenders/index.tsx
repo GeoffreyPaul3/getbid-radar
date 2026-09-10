@@ -177,8 +177,10 @@ function PursuitBadge({
   return <span className="text-[10px] font-mono text-muted-foreground">UNDECIDED</span>;
 }
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 function TendersListPage() {
-  const { workspace } = useWorkspace();
+  const { isReady, AuthLoadingFallback, workspace } = useRequireAuth();
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -283,6 +285,8 @@ function TendersListPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  if (!isReady) return AuthLoadingFallback;
 
   return (
     <AppShell>

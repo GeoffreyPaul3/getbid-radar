@@ -44,12 +44,15 @@ import type { Database } from "@/integrations/supabase/types";
 
 type BillingTransactionRow = Database["public"]["Tables"]["billing_transactions"]["Row"];
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 export const Route = createFileRoute("/billing/")({
   component: BillingPage,
 });
 
 function BillingPage() {
-  const { workspace, companyProfile, role } = useWorkspace();
+  const { isReady, AuthLoadingFallback, workspace } = useRequireAuth();
+  const { companyProfile, role } = useWorkspace();
   const navigate = useNavigate();
 
   // Selected currency (defaults to MWK if Malawi, otherwise USD)
@@ -119,6 +122,8 @@ function BillingPage() {
 
   const currentPlan = (workspace?.plan as PlanTier) || "trial";
   const currentPlanConfig = PLAN_CONFIGS[currentPlan] || PLAN_CONFIGS.trial;
+
+  if (!isReady) return AuthLoadingFallback;
 
   return (
     <AppShell>

@@ -377,8 +377,7 @@ async function emitAnalysisNotifications(params: {
   recommendation: string;
 }) {
   const { supabase, workspaceId, userId, opportunityId, title, score, recommendation } = params;
-  const siteUrl =
-    process.env["APP_URL"] || process.env["APP_URL"] || "https://getbidradar.com";
+  const siteUrl = process.env["APP_URL"] || "https://getbidradar.com";
 
   // 1. In-app notification
   try {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,12 +32,17 @@ export function AdminShell({ children, title, description }: AdminShellProps) {
 
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (authLoading) return;
     if (!user?.id) {
       setIsAdmin(false);
       setChecking(false);
+      navigate({
+        to: "/login",
+        search: { redirect: currentPath },
+      });
       return;
     }
 
@@ -74,36 +79,22 @@ export function AdminShell({ children, title, description }: AdminShellProps) {
     );
   }
 
-  // 2. Access Denied State (Clean, helpful instructions to self-grant)
+  // 2. Access Denied State (Clean, production-grade restricted screen)
   if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-lg rounded-2xl border border-destructive/30 bg-surface p-8 shadow-panel text-center space-y-5">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
-            <Lock className="h-7 w-7" />
+        <div className="w-full max-w-md rounded-2xl border border-border/80 bg-surface p-8 shadow-panel text-center space-y-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Lock className="h-6 w-6" />
           </div>
           <div className="space-y-2">
             <h1 className="font-display font-bold text-2xl text-foreground">
-              Platform Admin Restricted
+              Access Restricted
             </h1>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              This administrative area is reserved for GetBidRadar system operators. Your account does not currently possess platform operator privileges.
+            <p className="text-sm text-text-secondary leading-relaxed">
+              This administrative area is reserved for GetBidRadar platform operators. If you believe you should have access, please contact your system administrator.
             </p>
           </div>
-
-          {user?.id && (
-            <div className="rounded-xl border border-border bg-surface-muted/50 p-4 text-left space-y-2">
-              <p className="text-[11px] font-mono font-semibold uppercase text-muted-foreground">
-                Developer / Operator Self-Grant Instructions:
-              </p>
-              <pre className="p-3 rounded-md bg-canvas border border-border text-[11px] font-mono text-primary overflow-x-auto whitespace-pre-wrap select-all">
-                {`UPDATE profiles SET is_platform_admin = true WHERE id = '${user.id}';`}
-              </pre>
-              <p className="text-[10px] text-muted-foreground">
-                Run the query above in your Supabase SQL editor, then refresh this page.
-              </p>
-            </div>
-          )}
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild variant="outline" className="text-xs">
@@ -113,7 +104,7 @@ export function AdminShell({ children, title, description }: AdminShellProps) {
               className="text-xs font-semibold"
               onClick={() => window.location.reload()}
             >
-              Refresh Authorization
+              Retry
             </Button>
           </div>
         </div>

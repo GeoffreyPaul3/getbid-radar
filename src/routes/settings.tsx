@@ -76,13 +76,15 @@ import {
 import type { WorkspaceMemberRecord, AppRole } from "@/lib/members/members.types";
 import { CurrencyCombobox } from "@/components/ui/currency-combobox";
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
-  const { user } = useAuth();
-  const { workspace, companyProfile, role, completenessScore, refetchWorkspace } = useWorkspace();
+  const { isReady, AuthLoadingFallback, user, workspace } = useRequireAuth();
+  const { companyProfile, role, completenessScore, refetchWorkspace } = useWorkspace();
   const [activeTab, setActiveTab] = useState("profile");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -369,6 +371,8 @@ function SettingsPage() {
       setIsSaving(false);
     }
   };
+
+  if (!isReady) return AuthLoadingFallback;
 
   return (
     <AppShell>

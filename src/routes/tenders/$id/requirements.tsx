@@ -89,10 +89,11 @@ function MatchBadge({ match, status }: { match?: string | null; status?: string 
   );
 }
 
+import { useRequireAuth } from "@/lib/use-require-auth";
+
 function RequirementsMatrixPage() {
   const { id } = useParams({ from: "/tenders/$id/requirements" });
-  const { user } = useAuth();
-  const { workspace } = useWorkspace();
+  const { isReady, AuthLoadingFallback, user, workspace } = useRequireAuth();
 
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [requirements, setRequirements] = useState<OpportunityRequirement[]>([]);
@@ -276,6 +277,8 @@ function RequirementsMatrixPage() {
       setIsCreatingTask(false);
     }
   };
+
+  if (!isReady) return AuthLoadingFallback;
 
   return (
     <AppShell>

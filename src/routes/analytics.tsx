@@ -27,6 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { useRequireAuth } from "@/lib/use-require-auth";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getWorkspaceAnalyticsFn } from "@/lib/analytics/analytics.functions";
 
@@ -77,15 +78,17 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function AnalyticsPage() {
-  const { workspace } = useWorkspace();
+  const { isReady, AuthLoadingFallback, workspace } = useRequireAuth();
 
   const { data: analytics, isLoading } = useQuery({
     queryKey: ["analytics", workspace?.id],
     queryFn: () =>
       workspace?.id ? getWorkspaceAnalyticsFn({ data: { workspaceId: workspace.id } }) : null,
-    enabled: !!workspace?.id,
+    enabled: isReady && !!workspace?.id,
     staleTime: 60_000,
   });
+
+  if (!isReady) return AuthLoadingFallback;
 
   const opportunityPipelineData = analytics
     ? [
