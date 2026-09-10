@@ -42,6 +42,7 @@ import {
   Briefcase,
   ListTodo,
   CheckSquare,
+  Receipt,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -564,7 +565,7 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/25 bg-primary-soft text-primary text-xs font-mono font-semibold uppercase tracking-wider mb-4">
-              <Sparkles className="h-3.5 w-3.5" /> Commercial Plans
+              <Receipt className="h-3.5 w-3.5" /> Commercial Plans
             </div>
             <h2 className="font-display font-bold text-3xl sm:text-4xl text-foreground tracking-tight mb-4">
               Transparent, Value-Aligned Pricing
