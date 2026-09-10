@@ -309,7 +309,7 @@ export async function sendContactMessageEmail(params: {
     process.env["CONTACT_EMAIL"] ||
     process.env["RESEND_TO_EMAIL"] ||
     process.env["SUPPORT_EMAIL"] ||
-    "support@getbidradar.com";
+    "designing90@gmail.com";
 
   const emailSubject = `[Contact Inquiry] ${params.subject.trim()}`;
   const text = `New Contact Form Inquiry from GetBidRadar\n\nName: ${params.name.trim()}\nEmail: ${params.email.trim()}\nSubject: ${params.subject.trim()}\n\nMessage:\n${params.message.trim()}\n\n---\nSent via GetBidRadar contact form. Reply directly to this email to respond.`;
@@ -369,7 +369,7 @@ export async function sendSupportTicketEmail(params: {
     process.env["SUPPORT_EMAIL"] ||
     process.env["CONTACT_EMAIL"] ||
     process.env["RESEND_TO_EMAIL"] ||
-    "support@getbidradar.com";
+    "designing90@gmail.com";
 
   const priorityLabel = params.priority || "Normal";
   const emailSubject = `[Support Ticket #${params.ticketId}] [${params.category}] ${params.subject.trim()}`;
