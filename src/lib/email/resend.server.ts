@@ -26,7 +26,7 @@ function getResendApiKey(): string | null {
 }
 
 function getFromAddress(): string {
-  return process.env["RESEND_FROM_EMAIL"] || "GetBidRadar <onboarding@resend.dev>";
+  return process.env["RESEND_FROM_EMAIL"] || "GetBidRadar <onboarding@getbidradar.com>";
 }
 
 async function sendViaResend(params: {
