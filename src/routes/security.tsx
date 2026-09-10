@@ -386,7 +386,7 @@ function SecurityPage() {
               },
               {
                 q: "Can I delete my data?",
-                a: "You can delete individual tender analyses, requirements, and knowledge base entries from within the application. For full account and workspace deletion, contact support@getbidradar.com. We will fulfill deletion requests in accordance with our Privacy Policy.",
+                a: "You can delete individual tender analyses, requirements, and knowledge base entries from within the application. For full account and workspace deletion, contact us. We will fulfill deletion requests in accordance with our Privacy Policy.",
               },
               {
                 q: "How long is my data retained?",
@@ -426,12 +426,7 @@ function SecurityPage() {
               Contact Us
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <a
-              href="mailto:support@getbidradar.com"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-surface-muted transition-colors"
-            >
-              support@getbidradar.com
-            </a>
+           
           </div>
           <p className="text-xs text-muted-foreground mt-8">
             Also see our{" "}

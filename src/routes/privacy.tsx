@@ -122,7 +122,7 @@ function PrivacyPage() {
               For data access requests, audit inquiries, or compliance questions, reach our Data Protection team at:
             </p>
             <div className="p-4 rounded-xl border border-border bg-surface text-xs font-mono">
-              <p>Email: privacy@getbidradar.com / support@getbidradar.com</p>
+              <p>Email: privacy@getbidradar.com </p>
               <p>Attn: Data Protection Officer</p>
               <p>GetBidRadar Security Operations</p>
             </div>

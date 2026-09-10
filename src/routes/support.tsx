@@ -367,21 +367,6 @@ function SupportPage() {
                 </li>
               </ul>
             </Card>
-
-            <Card className="border border-border bg-surface p-5 space-y-3 shadow-subtle text-xs">
-              <h3 className="font-bold text-foreground flex items-center gap-2">
-                <Mail className="h-4 w-4 text-primary" /> Direct Contact
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Prefer email directly? Reach out anytime:
-              </p>
-              <a
-                href="mailto:support@getbidradar.com"
-                className="font-mono text-primary hover:underline font-semibold block"
-              >
-                support@getbidradar.com
-              </a>
-            </Card>
           </div>
         </div>
       </div>

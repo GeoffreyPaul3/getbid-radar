@@ -120,7 +120,7 @@ function TermsPage() {
               If you have any questions regarding these Terms of Service or need to serve legal notice, please contact our legal counsel at:
             </p>
             <div className="p-4 rounded-xl border border-border bg-surface text-xs font-mono">
-              <p>Email: legal@getbidradar.com / support@getbidradar.com</p>
+              <p>Email: legal@getbidradar.com </p>
               <p>Attn: Legal & Compliance Operations</p>
               <p>GetBidRadar Systems</p>
             </div>

@@ -268,11 +268,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                     Contact Sales
                   </Link>
                 </li>
-                <li>
-                  <a href="mailto:support@getbidradar.com" className="hover:text-foreground transition-colors">
-                    support@getbidradar.com
-                  </a>
-                </li>
+               
               </ul>
             </div>
 
