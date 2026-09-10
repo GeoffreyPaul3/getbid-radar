@@ -51,11 +51,15 @@ import {
   UserPlus,
   Mail,
   Trash2,
+  User,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import type { Database } from "@/integrations/supabase/types";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/lib/profile-utils";
+import { uploadUserAvatar, removeUserAvatar } from "@/lib/profile/avatar";
 import {
   PLAN_CONFIGS,
   formatBillingAmount,
@@ -79,8 +83,88 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const { user } = useAuth();
   const { workspace, companyProfile, role, completenessScore, refetchWorkspace } = useWorkspace();
-  const [activeTab, setActiveTab] = useState("company");
+  const [activeTab, setActiveTab] = useState("profile");
   const [isSaving, setIsSaving] = useState(false);
+
+  // User Profile State
+  const [profileFullName, setProfileFullName] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSavingUserProfile, setIsSavingUserProfile] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // Load user profile on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProfileFullName(data.full_name || "");
+          setProfileAvatarUrl(data.avatar_url || null);
+        }
+      });
+  }, [user?.id]);
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setAvatarError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const res = await uploadUserAvatar(user.id, file);
+      if (res.success && res.avatarUrl) {
+        setProfileAvatarUrl(res.avatarUrl);
+        toast.success("Profile photo updated");
+      } else {
+        setAvatarError(res.error || "Failed to upload photo");
+        toast.error("Upload failed", { description: res.error });
+      }
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.id) return;
+    setIsUploadingAvatar(true);
+    try {
+      const res = await removeUserAvatar(user.id);
+      if (res.success) {
+        setProfileAvatarUrl(null);
+        toast.success("Profile photo removed");
+      } else {
+        toast.error("Failed to remove photo", { description: res.error });
+      }
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleSaveUserProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) return;
+    setIsSavingUserProfile(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: profileFullName.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+      toast.success("Profile details saved");
+    } catch (err) {
+      toast.error("Failed to save profile", { description: (err as Error).message });
+    } finally {
+      setIsSavingUserProfile(false);
+    }
+  };
 
   // Form State
   const [companyName, setCompanyName] = useState("");
@@ -312,7 +396,10 @@ function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full sm:w-[460px] grid-cols-3 bg-secondary/80">
+          <TabsList className="grid w-full sm:w-[580px] grid-cols-4 bg-secondary/80">
+            <TabsTrigger value="profile" className="text-xs font-medium flex items-center gap-2">
+              <User className="h-3.5 w-3.5" /> My Profile
+            </TabsTrigger>
             <TabsTrigger value="company" className="text-xs font-medium flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" /> Company Profile
             </TabsTrigger>
@@ -323,6 +410,156 @@ function SettingsPage() {
               <CreditCard className="h-3.5 w-3.5" /> Billing & Plan
             </TabsTrigger>
           </TabsList>
+
+          {/* TAB 0: Personal Profile & Avatar */}
+          <TabsContent value="profile" className="mt-4 space-y-6">
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader>
+                <CardTitle className="font-display text-lg">
+                  Personal Profile & Avatar
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Manage your personal account photo, name, and role preferences.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-0">
+                {avatarError && (
+                  <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                    <span>{avatarError}</span>
+                  </div>
+                )}
+
+                {/* Avatar Section */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-4 rounded-xl border border-border/60 bg-surface-muted/30">
+                  <div className="relative group">
+                    {profileAvatarUrl ? (
+                      <img
+                        src={profileAvatarUrl}
+                        alt="Profile photo"
+                        className="h-20 w-20 rounded-full object-cover border-2 border-border shadow-sm"
+                      />
+                    ) : (
+                      <div className="h-20 w-20 rounded-full bg-primary-soft text-primary border-2 border-border/80 flex items-center justify-center font-mono text-xl font-bold shadow-sm">
+                        {user?.email?.slice(0, 2).toUpperCase() || "GB"}
+                      </div>
+                    )}
+                    {isUploadingAvatar && (
+                      <div className="absolute inset-0 bg-background/80 rounded-full flex items-center justify-center backdrop-blur-xs">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 flex-1">
+                    <h4 className="text-sm font-semibold text-foreground">Profile Photo</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Upload a square image (JPEG, PNG, or WebP up to 5 MB). This photo appears in your sidebar, top nav, and team roster.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handleAvatarFileChange}
+                          disabled={isUploadingAvatar}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isUploadingAvatar}
+                          className="text-xs pointer-events-none"
+                        >
+                          <Camera className="h-3.5 w-3.5 mr-1.5" />
+                          {isUploadingAvatar ? "Uploading..." : "Upload Photo"}
+                        </Button>
+                      </label>
+                      {profileAvatarUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isUploadingAvatar}
+                          onClick={handleRemoveAvatar}
+                          className="text-xs text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Form */}
+                <form onSubmit={handleSaveUserProfile} className="space-y-4 pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="profile-fullname" className="text-xs">
+                        Full Name
+                      </Label>
+                      <Input
+                        id="profile-fullname"
+                        type="text"
+                        placeholder="e.g. Jane Doe"
+                        value={profileFullName}
+                        onChange={(e) => setProfileFullName(e.target.value)}
+                        className="h-10 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="profile-email" className="text-xs">
+                        Email Address
+                      </Label>
+                      <Input
+                        id="profile-email"
+                        type="email"
+                        disabled
+                        value={user?.email || ""}
+                        className="h-10 text-sm bg-muted/40 text-muted-foreground cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Workspace Role</Label>
+                      <div className="flex items-center h-10 px-3 rounded-md border border-border bg-muted/20 text-xs font-mono uppercase tracking-wider text-foreground">
+                        {role || "member"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Current Workspace</Label>
+                      <div className="flex items-center h-10 px-3 rounded-md border border-border bg-muted/20 text-xs text-foreground truncate">
+                        {companyProfile?.company_name || workspace?.name || "Active Workspace"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={isSavingUserProfile}
+                      className="font-medium text-xs px-5"
+                    >
+                      {isSavingUserProfile ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-3.5 w-3.5 mr-2" /> Save Profile Details
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* TAB 1: Company Profile Calibration */}
           <TabsContent value="company" className="mt-4 space-y-6">

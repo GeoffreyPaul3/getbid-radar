@@ -28,8 +28,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/lib/profile-utils";
+import { z } from "zod";
+import { getSafeRedirect } from "@/lib/auth-redirect";
+
+const onboardingSearchSchema = z.object({
+  redirect: z.string().optional(),
+});
 
 export const Route = createFileRoute("/onboarding")({
+  validateSearch: (search) => onboardingSearchSchema.parse(search),
   component: OnboardingPage,
 });
 
@@ -43,6 +50,8 @@ function OnboardingPage() {
     refetchWorkspace,
   } = useWorkspace();
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const safeRedirect = getSafeRedirect(search.redirect);
 
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,12 +98,12 @@ function OnboardingPage() {
     }
   }, [companyProfile]);
 
-  // If already onboarded, redirect to dashboard
+  // If already onboarded, redirect to destination or dashboard
   useEffect(() => {
     if (!authLoading && isOnboarded) {
-      navigate({ to: "/dashboard" });
+      navigate({ to: safeRedirect || "/dashboard" });
     }
-  }, [authLoading, isOnboarded, navigate]);
+  }, [authLoading, isOnboarded, safeRedirect, navigate]);
 
   if (authLoading || wsLoading) {
     return (
@@ -223,7 +232,7 @@ function OnboardingPage() {
 
       await refetchWorkspace();
       toast.success("Company profile calibrated successfully!");
-      navigate({ to: "/dashboard" });
+      navigate({ to: safeRedirect || "/dashboard" });
     } catch (err) {
       toast.error("Error finalizing profile", { description: (err as Error).message });
     } finally {

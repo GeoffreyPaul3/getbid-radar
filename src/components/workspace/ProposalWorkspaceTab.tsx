@@ -33,19 +33,33 @@ import {
   Copy,
   Eye,
   Edit3,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   listProposalSectionsFn,
   draftProposalSectionFn,
   saveProposalSectionFn,
   exportProposalFn,
   getProposalCompletenessFn,
+  deleteProposalSectionFn,
 } from "@/lib/proposal/proposal.functions";
 import {
   PROPOSAL_SECTION_TYPES,
+  REQUIRED_PROPOSAL_SECTION_TYPES,
   type ProposalDocRecord,
   type ProposalSectionType,
+  type ProposalCompletenessResult,
 } from "@/lib/proposal/proposal.types";
 
 interface ProposalWorkspaceTabProps {
@@ -54,19 +68,14 @@ interface ProposalWorkspaceTabProps {
   opportunityTitle?: string | undefined;
 }
 
-export function ProposalWorkspaceTab({
+function ProposalWorkspaceTabComponent({
   opportunityId,
   workspaceId,
   opportunityTitle,
 }: ProposalWorkspaceTabProps) {
   const [sections, setSections] = useState<ProposalDocRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completeness, setCompleteness] = useState<{
-    score: number;
-    drafted: number;
-    total: number;
-    hasEvidenceGaps: boolean;
-  } | null>(null);
+  const [completeness, setCompleteness] = useState<ProposalCompletenessResult | null>(null);
 
   // Active section for editing
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -75,6 +84,8 @@ export function ProposalWorkspaceTab({
   const [activeType, setActiveType] = useState<string>("technical_approach");
   const [isSaving, setIsSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<ProposalDocRecord | null>(null);
+  const [isDeletingSection, setIsDeletingSection] = useState(false);
 
   // AI Generation Dialog
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
@@ -439,7 +450,7 @@ export function ProposalWorkspaceTab({
 
       {/* ── Completeness Banner ── */}
       {completeness && (
-        <Card className="border border-border/80 bg-card p-4">
+        <Card className="border border-border/80 bg-card p-4 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -449,9 +460,9 @@ export function ProposalWorkspaceTab({
                 <Badge
                   variant="outline"
                   className={`font-mono text-[10px] ${
-                    completeness.score >= 80
+                    completeness.score === 100
                       ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                      : completeness.score >= 40
+                      : completeness.score >= 50
                         ? "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10"
                         : "border-destructive/40 text-destructive bg-destructive/10"
                   }`}
@@ -460,7 +471,8 @@ export function ProposalWorkspaceTab({
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {completeness.drafted} of {completeness.total} core response sections drafted.
+                {completeness.completed} of {completeness.total} required response sections fully
+                completed.
                 {completeness.hasEvidenceGaps && (
                   <span className="text-amber-600 dark:text-amber-400 ml-1 font-medium">
                     Evidence gaps remain to be verified.
@@ -469,18 +481,50 @@ export function ProposalWorkspaceTab({
               </p>
             </div>
 
-            <div className="w-full sm:w-48 bg-secondary rounded-full h-2 overflow-hidden">
+            <div className="w-full sm:w-48 bg-secondary rounded-full h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  completeness.score >= 80
+                  completeness.score === 100
                     ? "bg-emerald-500"
-                    : completeness.score >= 40
+                    : completeness.score >= 50
                       ? "bg-amber-500"
                       : "bg-destructive"
                 }`}
                 style={{ width: `${completeness.score}%` }}
               />
             </div>
+          </div>
+
+          {/* Core Required Section Indicators */}
+          <div className="pt-2 border-t border-border/40 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-mono text-muted-foreground uppercase">
+              Required Sections:
+            </span>
+            {REQUIRED_PROPOSAL_SECTION_TYPES.map((reqType) => {
+              const status = completeness.requiredSectionsStatus?.[reqType] || "missing";
+              const label = reqType.replace(/_/g, " ");
+              return (
+                <span
+                  key={reqType}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono capitalize border ${
+                    status === "complete"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                      : status === "in_progress"
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                        : "bg-surface-muted text-muted-foreground border-border/60"
+                  }`}
+                >
+                  {status === "complete" ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  ) : status === "in_progress" ? (
+                    <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  ) : (
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                  )}
+                  {label} ({status.replace(/_/g, " ")})
+                </span>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -621,6 +665,17 @@ export function ProposalWorkspaceTab({
                     >
                       <Copy className="h-3.5 w-3.5" /> Copy
                     </Button>
+                    {activeSection && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteSectionTarget(activeSection)}
+                        className="h-8 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete Section"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       onClick={handleSaveActive}
@@ -691,6 +746,61 @@ export function ProposalWorkspaceTab({
           </div>
         </div>
       )}
+
+      {/* Delete Section Dialog */}
+      <AlertDialog
+        open={Boolean(deleteSectionTarget)}
+        onOpenChange={(open) => !open && setDeleteSectionTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Proposal Section?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{deleteSectionTarget?.title}&quot;? This action
+              cannot be undone and will immediately recalculate proposal completeness.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSection}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteSectionTarget) return;
+                setIsDeletingSection(true);
+                try {
+                  await deleteProposalSectionFn({
+                    data: { sectionId: deleteSectionTarget.id, workspaceId },
+                  });
+                  toast.success("Section removed from proposal");
+                  if (activeSectionId === deleteSectionTarget.id) {
+                    setActiveSectionId(null);
+                    setActiveTitle("");
+                    setActiveContent("");
+                  }
+                  setDeleteSectionTarget(null);
+                  await loadData();
+                } catch (err) {
+                  toast.error("Failed to delete section", {
+                    description: (err as Error).message,
+                  });
+                } finally {
+                  setIsDeletingSection(false);
+                }
+              }}
+              disabled={isDeletingSection}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingSection ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Delete Section
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+export const ProposalWorkspaceTab = ProposalWorkspaceTabComponent;

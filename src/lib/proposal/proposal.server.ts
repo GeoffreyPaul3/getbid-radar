@@ -6,6 +6,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { callStructuredAi } from "@/lib/ai/gateway.server";
 import { z } from "zod";
+import {
+  deriveCompleteness,
+  computeProposalCompleteness,
+  type ProposalCompletenessResult,
+} from "./proposal-calc";
 
 export type Client = SupabaseClient<Database>;
 export type ProposalDocRecord = Database["public"]["Tables"]["proposal_documents"]["Row"];
@@ -65,16 +70,6 @@ export async function getOrCreateBidWorkspace(
   return created.id;
 }
 
-/** Derive section completeness from content length and evidence gaps */
-function deriveCompleteness(
-  content: string | null,
-): "draft" | "in_progress" | "complete" | "evidence_required" {
-  if (!content || content.trim().length < 50) return "draft";
-  if (content.includes("[Evidence required:")) return "evidence_required";
-  if (content.trim().length > 500) return "complete";
-  return "in_progress";
-}
-
 /**
  * Draft a proposal section using AI, strictly grounded in company evidence.
  * Any claim without evidence is marked [Evidence required: <description>].
@@ -109,7 +104,9 @@ export async function draftProposalSection(
         .limit(15),
       supabase
         .from("company_profiles")
-        .select("company_name, industry, description, country, currency, employee_count, website, years_in_operation")
+        .select(
+          "company_name, industry, description, country, currency, employee_count, website, years_in_operation",
+        )
         .eq("workspace_id", workspaceId)
         .maybeSingle(),
     ]);
@@ -119,7 +116,10 @@ export async function draftProposalSection(
     .join("\n");
 
   const requirementsSummary = (requirements ?? [])
-    .map((r) => `- [${r.importance?.toUpperCase() || "REQ"}] ${r.requirement}${r.evidence_needed ? ` (Evidence: ${r.evidence_needed})` : ""}`)
+    .map(
+      (r) =>
+        `- [${r.importance?.toUpperCase() || "REQ"}] ${r.requirement}${r.evidence_needed ? ` (Evidence: ${r.evidence_needed})` : ""}`,
+    )
     .join("\n");
 
   const draftSchema = z.object({
@@ -215,7 +215,12 @@ export async function saveProposalSection(
   },
 ): Promise<{ id: string; version: number }> {
   const completeness_status = deriveCompleteness(sectionData.content);
-  const bidWorkspaceId = await getOrCreateBidWorkspace(supabase, workspaceId, opportunityId, userId);
+  const bidWorkspaceId = await getOrCreateBidWorkspace(
+    supabase,
+    workspaceId,
+    opportunityId,
+    userId,
+  );
 
   if (sectionData.id) {
     // Fetch current version
@@ -312,24 +317,30 @@ export async function exportProposal(
   return { title, markdown };
 }
 
-/** Calculate proposal completeness score (0–100) */
+/** Calculate proposal completeness score (0–100) using canonical required section types */
 export async function calculateProposalCompleteness(
   supabase: Client,
   workspaceId: string,
   opportunityId: string,
-): Promise<{ score: number; drafted: number; total: number; hasEvidenceGaps: boolean }> {
+): Promise<ProposalCompletenessResult> {
   const sections = await listProposalSections(supabase, workspaceId, opportunityId);
+  return computeProposalCompleteness(sections);
+}
 
-  const coreTypes = ["executive_summary", "technical_approach", "financial_proposal"];
-  const drafted = sections.filter((s) =>
-    ["in_progress", "complete", "evidence_required"].includes(s.completeness_status ?? "draft"),
-  ).length;
-  const completed = sections.filter((s) => s.completeness_status === "complete").length;
-  const total = Math.max(sections.length, coreTypes.length);
-  const hasEvidenceGaps = sections.some((s) =>
-    s.content?.includes("[Evidence required:"),
-  );
+/** Delete a proposal section from workspace */
+export async function deleteProposalSection(
+  supabase: Client,
+  workspaceId: string,
+  sectionId: string,
+): Promise<{ success: boolean }> {
+  const { error } = await supabase
+    .from("proposal_documents")
+    .delete()
+    .eq("id", sectionId)
+    .eq("workspace_id", workspaceId);
 
-  const score = total === 0 ? 0 : Math.round(((completed * 2 + drafted) / (total * 2)) * 100);
-  return { score: Math.min(100, score), drafted, total, hasEvidenceGaps };
+  if (error) {
+    throw new Error(`Failed to delete proposal section: ${error.message}`);
+  }
+  return { success: true };
 }

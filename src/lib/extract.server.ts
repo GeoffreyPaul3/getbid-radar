@@ -124,7 +124,9 @@ async function extractPdf(bytes: Uint8Array): Promise<ExtractResult> {
     const stripped = merged.replace(/\[\[page \d+\]\]/g, "").trim();
     if (stripped.length < 40) {
       // Scanned PDF — attempt Gemini multimodal OCR
-      console.log(`[Extract] PDF text layer insufficient (${stripped.length} chars). Attempting OCR fallback.`);
+      console.log(
+        `[Extract] PDF text layer insufficient (${stripped.length} chars). Attempting OCR fallback.`,
+      );
       const ocrResult = await ocrPdfWithGemini(bytes);
       if (!ocrResult.ok) {
         // Return OCR-specific error but attach page count
@@ -137,7 +139,6 @@ async function extractPdf(bytes: Uint8Array): Promise<ExtractResult> {
     return { ok: false, text: "", reason: `PDF could not be parsed: ${(e as Error).message}` };
   }
 }
-
 
 function extractDocx(bytes: Uint8Array): ExtractResult {
   try {

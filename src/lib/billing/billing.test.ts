@@ -95,16 +95,38 @@ describe("Server Entitlement Engine", () => {
           };
         }
         if (table === "usage_records") {
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            gte: vi.fn().mockResolvedValue({
-              data: params.usageRecords ?? [],
-              error: null,
-            }),
+          // The entitlements server chains: .select().eq().eq().gte().lt?.().not?.()
+          // Each filter method must return `this`; the final await resolves the thenable.
+          const usageResult = { data: params.usageRecords ?? [], error: null };
+          // Use an explicit typed interface to avoid TS4111 (noPropertyAccessFromIndexSignature)
+          type UsageBuilder = {
+            select: ReturnType<typeof vi.fn>;
+            eq: ReturnType<typeof vi.fn>;
+            gte: ReturnType<typeof vi.fn>;
+            lt: ReturnType<typeof vi.fn>;
+            not: ReturnType<typeof vi.fn>;
+            insert: ReturnType<typeof vi.fn>;
+            limit: ReturnType<typeof vi.fn>;
+            then: (resolve: (v: typeof usageResult) => void) => void;
+          };
+          const usageBuilder: UsageBuilder = {
+            select: vi.fn(),
+            eq: vi.fn(),
+            gte: vi.fn(),
+            lt: vi.fn(),
+            not: vi.fn(),
             insert: vi.fn().mockResolvedValue({ error: null }),
             limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+            // Make the builder itself awaitable so the final `await usageQuery` resolves
+            then: (resolve) => resolve(usageResult),
           };
+          // Ensure all chainable methods return the same builder object
+          usageBuilder.select.mockReturnValue(usageBuilder);
+          usageBuilder.eq.mockReturnValue(usageBuilder);
+          usageBuilder.gte.mockReturnValue(usageBuilder);
+          usageBuilder.lt.mockReturnValue(usageBuilder);
+          usageBuilder.not.mockReturnValue(usageBuilder);
+          return usageBuilder;
         }
         if (table === "activity_logs") {
           return {

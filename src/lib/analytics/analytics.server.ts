@@ -62,14 +62,8 @@ export async function getWorkspaceAnalytics(
       .from("bid_workspaces")
       .select("id, opportunity_id, status")
       .eq("workspace_id", workspaceId),
-    supabase
-      .from("bid_outcomes")
-      .select("result, opportunity_id")
-      .eq("workspace_id", workspaceId),
-    supabase
-      .from("bid_tasks")
-      .select("id, status, due_date")
-      .eq("workspace_id", workspaceId),
+    supabase.from("bid_outcomes").select("result, opportunity_id").eq("workspace_id", workspaceId),
+    supabase.from("bid_tasks").select("id, status, due_date").eq("workspace_id", workspaceId),
     supabase
       .from("compliance_findings")
       .select("id, status, severity")
@@ -121,7 +115,8 @@ export async function getWorkspaceAnalytics(
 
   // Bid execution & active bidding
   const activeBids = bws.filter(
-    (b) => b.status === "preparing" || b.status === "ready_for_review" || b.status === "ready_to_submit",
+    (b) =>
+      b.status === "preparing" || b.status === "ready_for_review" || b.status === "ready_to_submit",
   ).length;
   const biddingActive = activeBids;
 

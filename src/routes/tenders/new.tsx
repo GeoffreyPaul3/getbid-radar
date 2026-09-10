@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -28,8 +29,19 @@ export const Route = createFileRoute("/tenders/new")({
 });
 
 function NewTenderPage() {
-  const { workspace } = useWorkspace();
+  const { user, isLoading: authLoading } = useAuth();
+  const { workspace, isLoading: wsLoading } = useWorkspace();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate({
+        to: "/login",
+        search: { redirect: "/tenders/new" },
+      });
+    }
+  }, [authLoading, user, navigate]);
+
   const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
 
   // Shared metadata
@@ -169,6 +181,23 @@ function NewTenderPage() {
       setIsIngestingUrl(false);
     }
   };
+
+  if (authLoading || (!workspace && wsLoading)) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+          <p className="text-xs text-muted-foreground font-mono">
+            Verifying workspace credentials...
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <AppShell>

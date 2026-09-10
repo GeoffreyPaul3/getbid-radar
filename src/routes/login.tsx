@@ -1,7 +1,10 @@
 import React, { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { useWorkspace } from "@/lib/workspace-context";
+import { getSafeRedirect, resolveAuthDestination } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,15 +19,24 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldCheck, Radar, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import logo from "@/assets/bidradar.png"
+import logo from "@/assets/bidradar.png";
+
+const loginSearchSchema = z.object({
+  redirect: z.string().optional(),
+});
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search) => loginSearchSchema.parse(search),
   component: LoginPage,
 });
 
 function LoginPage() {
   const { user } = useAuth();
+  const { workspace, isOnboarded, isLoading: wsLoading } = useWorkspace();
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const rawRedirect = search.redirect;
+
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,12 +45,17 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // If already logged in, route to home which decides between onboarding & dashboard
+  // If already logged in, route to destination or dashboard/onboarding
   React.useEffect(() => {
-    if (user) {
-      navigate({ to: "/" });
+    if (user && !wsLoading) {
+      const destination = resolveAuthDestination({
+        hasWorkspace: Boolean(workspace),
+        isOnboarded,
+        rawRedirect,
+      });
+      navigate({ to: destination });
     }
-  }, [user, navigate]);
+  }, [user, wsLoading, workspace, isOnboarded, rawRedirect, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +72,26 @@ function LoginPage() {
         setErrorMsg(error.message);
         toast.error("Sign in failed", { description: error.message });
       } else if (data.session) {
+        // Deterministically check workspace membership for immediate navigation
+        const { data: memberRows } = await supabase
+          .from("workspace_members")
+          .select("workspace_id, workspaces(onboarding_completed_at)")
+          .eq("user_id", data.session.user.id)
+          .limit(1);
+
+        const hasWs = Boolean(memberRows && memberRows.length > 0);
+        const wsObj = memberRows?.[0]?.workspaces as unknown as
+          { onboarding_completed_at?: string | null } | undefined;
+        const isCompleted = Boolean(wsObj?.onboarding_completed_at);
+
+        const destination = resolveAuthDestination({
+          hasWorkspace: hasWs,
+          isOnboarded: isCompleted,
+          rawRedirect,
+        });
+
         toast.success("Welcome back!");
-        navigate({ to: "/" });
+        navigate({ to: destination });
       }
     } catch (err) {
       const msg = (err as Error).message;
@@ -89,7 +124,11 @@ function LoginPage() {
         toast.error("Account creation failed", { description: error.message });
       } else if (data.session) {
         toast.success("Account created successfully!");
-        navigate({ to: "/onboarding" });
+        const safeRedirect = getSafeRedirect(rawRedirect);
+        const dest = safeRedirect
+          ? `/onboarding?redirect=${encodeURIComponent(safeRedirect)}`
+          : "/onboarding";
+        navigate({ to: dest });
       } else {
         // Confirmation email required
         toast.info("Account registered! Please check your email for confirmation.");
@@ -124,12 +163,12 @@ function LoginPage() {
           <h1 className="font-display text-4xl font-extrabold tracking-tight text-white leading-tight">
             Stop guessing on complex tenders. Bid with certainty.
           </h1>
-          <p className="text-muted-foreground text-sm leading-relaxed text-gray-300">
+          <p className="text-sm leading-relaxed text-white/80">
             Extract mandatory RFP requirements in seconds, match against corporate qualifications,
             and receive explainable BID / REVIEW / NO-BID decisions backed by verified evidence.
           </p>
 
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs text-gray-300 font-mono">
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs text-white/80 font-mono">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-accent" /> Zero Hallucination
             </div>
@@ -140,7 +179,7 @@ function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-xs text-gray-400 font-mono">
+        <div className="text-xs text-white/60 font-mono">
           Enterprise Tender Intelligence Engine v2.0
         </div>
       </div>
@@ -210,6 +249,12 @@ function LoginPage() {
                         <Label htmlFor="signin-password" className="text-xs">
                           Password
                         </Label>
+                        <Link
+                          to="/forgot-password"
+                          className="text-xs text-primary hover:underline font-medium"
+                        >
+                          Forgot password?
+                        </Link>
                       </div>
                       <Input
                         id="signin-password"

@@ -48,6 +48,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  LayoutList,
+  Columns3,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -60,6 +62,46 @@ interface OpportunityListItem extends Opportunity {
 }
 
 const PAGE_SIZE = 10;
+
+interface KanbanColumnDef {
+  id: string;
+  title: string;
+  statuses: Database["public"]["Enums"]["opportunity_status"][];
+  badgeClass: string;
+}
+
+const KANBAN_COLUMNS: KanbanColumnDef[] = [
+  {
+    id: "new",
+    title: "1. Ingested & Analyzed",
+    statuses: ["new", "analyzing", "analyzed"],
+    badgeClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25",
+  },
+  {
+    id: "reviewing",
+    title: "2. Under Review",
+    statuses: ["reviewing"],
+    badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25",
+  },
+  {
+    id: "pursuing",
+    title: "3. Bid Preparation",
+    statuses: ["pursuing", "preparing"],
+    badgeClass: "bg-primary-soft text-primary border-primary/25",
+  },
+  {
+    id: "submitted",
+    title: "4. Submitted",
+    statuses: ["submitted"],
+    badgeClass: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25",
+  },
+  {
+    id: "decided",
+    title: "5. Closed / Awarded",
+    statuses: ["won", "lost", "no_bid", "archived"],
+    badgeClass: "bg-surface-muted text-muted-foreground border-border/80",
+  },
+];
 
 export const Route = createFileRoute("/tenders/")({
   component: TendersListPage,
@@ -144,6 +186,7 @@ function TendersListPage() {
     "all",
   );
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<OpportunityListItem | null>(null);
@@ -325,24 +368,56 @@ function TendersListPage() {
             ))}
           </div>
 
-          {/* Search Bar */}
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search tender title or buyer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-8 h-9 text-xs rounded-lg border-border bg-surface"
-            />
-            {searchQuery && (
+          {/* Controls Right: Search + View Switcher */}
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search tender title or buyer..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-8 h-9 text-xs rounded-lg border-border bg-surface"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface border border-border shrink-0">
               <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === "list"
+                    ? "bg-primary text-white shadow-subtle font-semibold"
+                    : "text-text-secondary hover:text-foreground hover:bg-surface-muted"
+                }`}
+                title="List Table View"
               >
-                <X className="h-3.5 w-3.5" />
+                <LayoutList className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">List</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === "kanban"
+                    ? "bg-primary text-white shadow-subtle font-semibold"
+                    : "text-text-secondary hover:text-foreground hover:bg-surface-muted"
+                }`}
+                title="Kanban Board View"
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -377,7 +452,7 @@ function TendersListPage() {
               </Button>
             )}
           </div>
-        ) : (
+        ) : viewMode === "list" ? (
           <div className="rounded-xl border border-border bg-surface shadow-subtle overflow-hidden">
             <Table className="min-w-[700px] w-full">
               <TableHeader>
@@ -584,6 +659,142 @@ function TendersListPage() {
                 </div>
               </div>
             )}
+          </div>
+        ) : (
+          /* ─── Kanban Board View ─── */
+          <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+            {KANBAN_COLUMNS.map((col) => {
+              const columnItems = filtered.filter((item) =>
+                col.statuses.includes(
+                  item.status as Database["public"]["Enums"]["opportunity_status"],
+                ),
+              );
+
+              return (
+                <div
+                  key={col.id}
+                  className="flex flex-col min-w-[280px] sm:min-w-[300px] flex-1 bg-surface-muted/30 rounded-xl border border-border p-3.5 space-y-3"
+                >
+                  {/* Column Header */}
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="font-display font-bold text-xs text-foreground flex items-center gap-1.5">
+                      {col.title}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${col.badgeClass}`}
+                    >
+                      {columnItems.length}
+                    </span>
+                  </div>
+
+                  {/* Cards List */}
+                  <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5">
+                    {columnItems.length === 0 ? (
+                      <div className="p-6 text-center border border-dashed border-border/60 rounded-lg bg-surface/30">
+                        <p className="text-xs text-muted-foreground font-mono">
+                          No tenders in stage
+                        </p>
+                      </div>
+                    ) : (
+                      columnItems.map((item) => {
+                        const hasAnalysis = Boolean(item.latest_analysis);
+                        const isProcessing = item.analysis_status === "processing";
+                        const score = item.latest_analysis?.bidradar_score;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-3.5 rounded-xl border border-border/80 bg-surface shadow-sm hover:border-primary/40 hover:shadow-subtle transition-all flex flex-col justify-between gap-3 group"
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                {isProcessing ? (
+                                  <span className="inline-flex items-center gap-1 text-primary text-[10px] font-mono font-semibold animate-pulse">
+                                    <Loader2 className="h-3 w-3 animate-spin" /> ANALYZING
+                                  </span>
+                                ) : hasAnalysis ? (
+                                  <RecommendationBadge rec={item.latest_analysis?.recommendation} />
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] font-mono">
+                                    UNANALYZED
+                                  </Badge>
+                                )}
+
+                                {score != null ? (
+                                  <div className="flex items-baseline gap-0.5 font-mono text-xs">
+                                    <span className="font-bold text-foreground">{score}</span>
+                                    <span className="text-[10px] text-muted-foreground">/100</span>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <Link
+                                to="/tenders/$id"
+                                params={{ id: item.id }}
+                                className="font-display font-bold text-sm text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-snug block"
+                                title={item.title}
+                              >
+                                {item.title}
+                              </Link>
+
+                              {item.buyer && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                                  <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{item.buyer}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground font-mono">
+                              <div className="flex items-center gap-1 text-[11px]">
+                                <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span>
+                                  {item.deadline
+                                    ? new Date(item.deadline).toLocaleDateString()
+                                    : "No deadline"}
+                                </span>
+                              </div>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  <DropdownMenuItem asChild>
+                                    <Link
+                                      to="/tenders/$id"
+                                      params={{ id: item.id }}
+                                      className="flex items-center gap-2 cursor-pointer text-xs"
+                                    >
+                                      <BarChart2 className="h-3.5 w-3.5 text-primary" />
+                                      <span>View Analysis</span>
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer text-xs"
+                                    onClick={() => setDeleteTarget(item)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span>Delete Tender</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

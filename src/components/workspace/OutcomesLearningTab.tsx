@@ -36,8 +36,8 @@ import type { BidOutcomeRecord, LearningInsights } from "@/lib/outcomes/outcomes
 interface OutcomesLearningTabProps {
   opportunityId: string;
   workspaceId: string;
-  contractCurrency?: string | null;
-  contractValue?: number | null;
+  contractCurrency?: string | null | undefined;
+  contractValue?: number | null | undefined;
 }
 
 export function OutcomesLearningTab({
@@ -56,9 +56,7 @@ export function OutcomesLearningTab({
   const [status, setStatus] = useState<"won" | "lost" | "cancelled" | "disqualified">("won");
   const [winningCompany, setWinningCompany] = useState("");
   const [winningPrice, setWinningPrice] = useState("");
-  const [ourBidPrice, setOurBidPrice] = useState(
-    contractValue ? String(contractValue) : "",
-  );
+  const [ourBidPrice, setOurBidPrice] = useState(contractValue ? String(contractValue) : "");
   const [evaluationScore, setEvaluationScore] = useState("");
   const [lossReason, setLossReason] = useState("Pricing / Financial Evaluation");
   const [disqualificationReason, setDisqualificationReason] = useState("");
@@ -383,9 +381,7 @@ export function OutcomesLearningTab({
                         <SelectItem value="Pricing / Financial Evaluation">
                           Pricing / Financial Evaluation
                         </SelectItem>
-                        <SelectItem value="Technical Score Lower">
-                          Technical Score Lower
-                        </SelectItem>
+                        <SelectItem value="Technical Score Lower">Technical Score Lower</SelectItem>
                         <SelectItem value="Incumbent Competitor Advantage">
                           Incumbent Competitor Advantage
                         </SelectItem>

@@ -188,9 +188,7 @@ export function GlobalSearchDialog({ open, onClose }: GlobalSearchDialogProps) {
                   <button
                     className={cn(
                       "w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors",
-                      i === selectedIndex
-                        ? "bg-primary-soft"
-                        : "hover:bg-surface-muted",
+                      i === selectedIndex ? "bg-primary-soft" : "hover:bg-surface-muted",
                     )}
                     onClick={() => selectResult(result)}
                     onMouseEnter={() => setSelectedIndex(i)}
@@ -208,7 +206,8 @@ export function GlobalSearchDialog({ open, onClose }: GlobalSearchDialogProps) {
                           <span
                             className={cn(
                               "text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0",
-                              BADGE_COLORS[result.badge] ?? "bg-surface-muted text-muted-foreground",
+                              BADGE_COLORS[result.badge] ??
+                                "bg-surface-muted text-muted-foreground",
                             )}
                           >
                             {result.badge}
@@ -239,9 +238,15 @@ export function GlobalSearchDialog({ open, onClose }: GlobalSearchDialogProps) {
 
         {/* Footer */}
         <div className="px-4 py-2 border-t border-border flex items-center gap-4 text-[10px] text-muted-foreground">
-          <span><kbd className="font-mono">↑↓</kbd> navigate</span>
-          <span><kbd className="font-mono">↵</kbd> open</span>
-          <span><kbd className="font-mono">Esc</kbd> close</span>
+          <span>
+            <kbd className="font-mono">↑↓</kbd> navigate
+          </span>
+          <span>
+            <kbd className="font-mono">↵</kbd> open
+          </span>
+          <span>
+            <kbd className="font-mono">Esc</kbd> close
+          </span>
         </div>
       </div>
     </>

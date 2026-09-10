@@ -53,13 +53,9 @@ export function SubmissionTrackingTab({
   // Submission Form State
   const [submissionMethod, setSubmissionMethod] = useState("E-Procurement Portal");
   const [confirmationNumber, setConfirmationNumber] = useState("");
-  const [bidPrice, setBidPrice] = useState<string>(
-    contractValue ? String(contractValue) : "",
-  );
+  const [bidPrice, setBidPrice] = useState<string>(contractValue ? String(contractValue) : "");
   const [currency, setCurrency] = useState(contractCurrency || "USD");
-  const [submittedAt, setSubmittedAt] = useState(
-    new Date().toISOString().slice(0, 16),
-  );
+  const [submittedAt, setSubmittedAt] = useState(new Date().toISOString().slice(0, 16));
   const [notes, setNotes] = useState("");
 
   const loadData = useCallback(async () => {
@@ -106,7 +102,9 @@ export function SubmissionTrackingTab({
           submission_method: submissionMethod,
           ...(confirmationNumber.trim() ? { confirmation_number: confirmationNumber.trim() } : {}),
           ...(notes.trim() ? { notes: notes.trim() } : {}),
-          submitted_at: submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString(),
+          submitted_at: submittedAt
+            ? new Date(submittedAt).toISOString()
+            : new Date().toISOString(),
           ...(bidPrice ? { bid_price: Number(bidPrice) } : {}),
           ...(currency ? { currency } : {}),
         },
@@ -413,7 +411,11 @@ export function SubmissionTrackingTab({
                 disabled={isSubmitting}
                 className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold text-xs gap-1.5"
               >
-                {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                {isSubmitting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
                 {submission ? "Update Submission Log" : "Confirm & Record Submission"}
               </Button>
             </div>

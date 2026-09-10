@@ -42,14 +42,11 @@ export type MatchVerdict = (typeof MATCH_VERDICTS)[number];
 export const RISK_LEVELS = ["low", "medium", "high"] as const;
 
 /** Normalise a confidence value: if > 1 it is treated as a percentage (85 → 0.85) */
-const normaliseConfidence = z.preprocess(
-  (v) => {
-    const n = Number(v);
-    if (isNaN(n)) return 0;
-    return n > 1 ? n / 100 : n;
-  },
-  z.number().min(0).max(1),
-);
+const normaliseConfidence = z.preprocess((v) => {
+  const n = Number(v);
+  if (isNaN(n)) return 0;
+  return n > 1 ? n / 100 : n;
+}, z.number().min(0).max(1));
 
 export const extractedRequirementSchema = z.object({
   title: z.string().min(3).max(300),

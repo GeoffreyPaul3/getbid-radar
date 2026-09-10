@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,7 +39,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import logo from "@/assets/bidradar.png";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
-import { getUnreadNotificationsFn, markAllReadFn } from "@/lib/notifications/notifications.functions";
+import {
+  getUnreadNotificationsFn,
+  markAllReadFn,
+} from "@/lib/notifications/notifications.functions";
 import type { Database } from "@/integrations/supabase/types";
 
 type NotificationRecord = Database["public"]["Tables"]["notifications"]["Row"];
@@ -56,6 +60,38 @@ export function AppShell({ children }: AppShellProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Fetch avatar for current user and listen for updates
+  useEffect(() => {
+    if (!user?.id) {
+      setAvatarUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (isMounted && data?.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+        }
+      });
+
+    const handleAvatarUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<{ avatarUrl: string | null }>).detail;
+      setAvatarUrl(detail?.avatarUrl ?? null);
+    };
+
+    window.addEventListener("profile:avatar-updated", handleAvatarUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("profile:avatar-updated", handleAvatarUpdate);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     try {
@@ -441,9 +477,18 @@ export function AppShell({ children }: AppShellProps) {
             {!isCollapsed ? (
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex h-7 w-7 rounded-full bg-primary-soft text-primary items-center justify-center font-mono text-xs font-bold shrink-0">
-                    {user?.email?.slice(0, 2).toUpperCase() || "GB"}
-                  </div>
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={user?.email || "Avatar"}
+                      className="h-7 w-7 rounded-full object-cover shrink-0 border border-border"
+                      onError={() => setAvatarUrl(null)}
+                    />
+                  ) : (
+                    <div className="flex h-7 w-7 rounded-full bg-primary-soft text-primary items-center justify-center font-mono text-xs font-bold shrink-0">
+                      {user?.email?.slice(0, 2).toUpperCase() || "GB"}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate text-foreground">{user?.email}</p>
                     <div className="flex items-center gap-1 mt-0.5">
@@ -468,9 +513,18 @@ export function AppShell({ children }: AppShellProps) {
               <div className="flex flex-col items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex h-7 w-7 rounded-full bg-primary-soft text-primary items-center justify-center font-mono text-xs font-bold cursor-default">
-                      {user?.email?.slice(0, 2).toUpperCase() || "GB"}
-                    </div>
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={user?.email || "Avatar"}
+                        className="h-7 w-7 rounded-full object-cover shrink-0 border border-border cursor-default"
+                        onError={() => setAvatarUrl(null)}
+                      />
+                    ) : (
+                      <div className="flex h-7 w-7 rounded-full bg-primary-soft text-primary items-center justify-center font-mono text-xs font-bold cursor-default">
+                        {user?.email?.slice(0, 2).toUpperCase() || "GB"}
+                      </div>
+                    )}
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     <p className="font-semibold">{user?.email}</p>
@@ -512,7 +566,9 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Search className="h-3.5 w-3.5" />
               <span>Search…</span>
-              <kbd className="ml-1 px-1 py-0.5 rounded border border-border bg-surface text-[10px] font-mono">⌘K</kbd>
+              <kbd className="ml-1 px-1 py-0.5 rounded border border-border bg-surface text-[10px] font-mono">
+                ⌘K
+              </kbd>
             </button>
 
             {/* Notification Bell */}
@@ -533,9 +589,14 @@ export function AppShell({ children }: AppShellProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <div className="flex items-center justify-between px-3 py-2">
-                  <DropdownMenuLabel className="p-0 text-xs font-semibold">Notifications</DropdownMenuLabel>
+                  <DropdownMenuLabel className="p-0 text-xs font-semibold">
+                    Notifications
+                  </DropdownMenuLabel>
                   {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                    <button
+                      onClick={markAllRead}
+                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    >
                       <CheckCheck className="h-3 w-3" />
                       Mark all read
                     </button>
@@ -543,12 +604,21 @@ export function AppShell({ children }: AppShellProps) {
                 </div>
                 <DropdownMenuSeparator />
                 {notifications.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-muted-foreground">No new notifications</div>
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    No new notifications
+                  </div>
                 ) : (
                   notifications.slice(0, 8).map((n) => (
-                    <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 cursor-pointer py-2.5">
+                    <DropdownMenuItem
+                      key={n.id}
+                      className="flex flex-col items-start gap-0.5 cursor-pointer py-2.5"
+                    >
                       <span className="text-xs font-medium text-foreground">{n.title}</span>
-                      {n.body && <span className="text-[11px] text-muted-foreground line-clamp-2">{n.body}</span>}
+                      {n.body && (
+                        <span className="text-[11px] text-muted-foreground line-clamp-2">
+                          {n.body}
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   ))
                 )}
@@ -610,7 +680,21 @@ export function AppShell({ children }: AppShellProps) {
                 })}
               </div>
               <div className="pt-2 border-t border-border flex items-center justify-between">
-                <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={user?.email || "Avatar"}
+                      className="h-6 w-6 rounded-full object-cover shrink-0 border border-border"
+                      onError={() => setAvatarUrl(null)}
+                    />
+                  ) : (
+                    <div className="flex h-6 w-6 rounded-full bg-primary-soft text-primary items-center justify-center font-mono text-[10px] font-bold shrink-0">
+                      {user?.email?.slice(0, 2).toUpperCase() || "GB"}
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"

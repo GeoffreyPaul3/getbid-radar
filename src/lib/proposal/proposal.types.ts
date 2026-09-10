@@ -24,3 +24,14 @@ export const PROPOSAL_SECTION_TYPES = [
 ] as const;
 
 export type ProposalSectionType = (typeof PROPOSAL_SECTION_TYPES)[number];
+
+export {
+  REQUIRED_PROPOSAL_SECTION_TYPES,
+  type RequiredProposalSectionType,
+  type ProposalSectionItem,
+  type ProposalCompletenessResult,
+  isSectionComplete,
+  isSectionInProgress,
+  deriveCompleteness,
+  computeProposalCompleteness,
+} from "./proposal-calc";

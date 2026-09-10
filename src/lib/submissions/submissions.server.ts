@@ -3,16 +3,13 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { sendSubmissionConfirmationEmail } from "../email/resend.server";
 
 export type Client = SupabaseClient<Database>;
 export type SubmissionRecord = Database["public"]["Tables"]["submissions"]["Row"];
 
 export type SubmissionStatus =
-  | "preparing"
-  | "ready_for_review"
-  | "ready_to_submit"
-  | "submitted"
-  | "withdrawn";
+  "preparing" | "ready_for_review" | "ready_to_submit" | "submitted" | "withdrawn";
 
 export interface SubmissionReadiness {
   isReady: boolean;
@@ -169,7 +166,12 @@ export async function recordSubmission(
     currency?: string;
   },
 ): Promise<{ id: string }> {
-  const bidWorkspaceId = await getOrCreateBidWorkspace(supabase, workspaceId, opportunityId, actorId);
+  const bidWorkspaceId = await getOrCreateBidWorkspace(
+    supabase,
+    workspaceId,
+    opportunityId,
+    actorId,
+  );
 
   // Check if a submission record already exists for this bid_workspace
   const { data: existing } = await supabase
@@ -198,6 +200,16 @@ export async function recordSubmission(
       .single();
 
     if (error || !data) throw new Error(`Failed to update submission: ${error?.message}`);
+    
+    await emitSubmissionNotifications({
+      supabase,
+      workspaceId,
+      opportunityId,
+      actorId,
+      submittedAt: submissionData.submitted_at || new Date().toISOString(),
+      confirmationNumber: submissionData.confirmation_number,
+    });
+
     return { id: data.id };
   } else {
     const { data, error } = await supabase
@@ -218,7 +230,74 @@ export async function recordSubmission(
       .single();
 
     if (error || !data) throw new Error(`Failed to record submission: ${error?.message}`);
+
+    await emitSubmissionNotifications({
+      supabase,
+      workspaceId,
+      opportunityId,
+      actorId,
+      submittedAt: submissionData.submitted_at || new Date().toISOString(),
+      confirmationNumber: submissionData.confirmation_number,
+    });
+
     return { id: data.id };
+  }
+}
+
+async function emitSubmissionNotifications(params: {
+  supabase: Client;
+  workspaceId: string;
+  opportunityId: string;
+  actorId: string;
+  submittedAt: string;
+  confirmationNumber?: string | undefined;
+}) {
+  const { supabase, workspaceId, opportunityId, actorId, submittedAt, confirmationNumber } = params;
+
+  try {
+    const { data: opp } = await supabase
+      .from("opportunities")
+      .select("title")
+      .eq("id", opportunityId)
+      .maybeSingle();
+
+    const tenderTitle = opp?.title || "Tender Proposal";
+    const formattedDate = new Date(submittedAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    // In-app notification
+    await supabase.from("notifications").insert({
+      workspace_id: workspaceId,
+      user_id: actorId,
+      kind: "submission_recorded",
+      title: `Submission Logged: ${tenderTitle}`,
+      body: `Formal proposal submission recorded on ${formattedDate}.`,
+      link: `/tenders/${opportunityId}/workspace`,
+    });
+
+    // Email notification
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", actorId)
+      .maybeSingle();
+
+    if (profile?.email) {
+      const siteUrl =
+        process.env["VITE_SITE_URL"] || process.env["NEXT_PUBLIC_SITE_URL"] || "https://getbidradar.com";
+      await sendSubmissionConfirmationEmail({
+        to: profile.email,
+        tenderTitle,
+        submissionDate: formattedDate,
+        ...(confirmationNumber ? { referenceNumber: confirmationNumber } : {}),
+        url: `${siteUrl}/tenders/${opportunityId}/workspace`,
+      });
+    }
+  } catch (err) {
+    console.warn("[Submissions] Notification emission warning:", err);
   }
 }
 

@@ -3,11 +3,7 @@ import type { Database } from "@/integrations/supabase/types";
 export type SubmissionRecord = Database["public"]["Tables"]["submissions"]["Row"];
 
 export type SubmissionStatus =
-  | "preparing"
-  | "ready_for_review"
-  | "ready_to_submit"
-  | "submitted"
-  | "withdrawn";
+  "preparing" | "ready_for_review" | "ready_to_submit" | "submitted" | "withdrawn";
 
 export interface SubmissionReadiness {
   isReady: boolean;

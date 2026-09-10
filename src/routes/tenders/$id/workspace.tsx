@@ -692,625 +692,633 @@ function BidWorkspacePage() {
           <>
             {/* ── Operational Deadline Intelligence ─────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Deadline card */}
-          <Card
-            className={`border p-5 ${dl.urgencyLevel !== "none" ? ug.bg : "border-border/80 bg-card"}`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono uppercase text-muted-foreground">
-                Submission Deadline
-              </span>
-              <Timer className={`h-4 w-4 ${ug.color}`} />
-            </div>
-            <p
-              className={`font-display font-bold text-lg ${dl.urgencyLevel !== "none" ? ug.color : "text-foreground"}`}
-            >
-              {dl.deadline ? dl.deadline.toLocaleDateString() : "Not stated"}
-            </p>
-            <p className={`text-[11px] mt-0.5 font-mono ${ug.color}`}>
-              {dl.isOverdue
-                ? `Overdue by ${Math.abs(dl.daysRemaining ?? 0)} days`
-                : dl.daysRemaining !== null
-                  ? `${dl.daysRemaining} day${dl.daysRemaining !== 1 ? "s" : ""} remaining`
-                  : "No deadline specified"}
-            </p>
-          </Card>
-
-          {/* Tasks progress */}
-          <Card className="border border-border/80 bg-card p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono uppercase text-muted-foreground">
-                Tasks Completed
-              </span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </div>
-            <p className="font-display font-bold text-lg text-foreground">
-              {readinessReport.completedTaskCount} / {readinessReport.totalTaskCount}
-            </p>
-            <div className="w-full bg-secondary h-1.5 rounded-full mt-2 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${readinessReport.totalTaskCount > 0 ? (readinessReport.completedTaskCount / readinessReport.totalTaskCount) * 100 : 0}%`,
-                }}
-              />
-            </div>
-          </Card>
-
-          {/* Overdue tasks */}
-          <Card
-            className={`border p-5 ${dl.overdueTasks.length > 0 ? "border-destructive/30 bg-destructive/5" : "border-border/80 bg-card"}`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono uppercase text-muted-foreground">
-                Overdue Tasks
-              </span>
-              <AlertCircle
-                className={`h-4 w-4 ${dl.overdueTasks.length > 0 ? "text-destructive" : "text-muted-foreground"}`}
-              />
-            </div>
-            <p
-              className={`font-display font-bold text-lg ${dl.overdueTasks.length > 0 ? "text-destructive" : "text-foreground"}`}
-            >
-              {dl.overdueTasks.length}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {dl.tasksDueSoon.length > 0
-                ? `+${dl.tasksDueSoon.length} due within 48h`
-                : "No overdue tasks"}
-            </p>
-          </Card>
-
-          {/* Contract Value */}
-          <Card className="border border-border/80 bg-card p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono uppercase text-muted-foreground">
-                Est. Contract Value
-              </span>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="font-display font-bold text-lg text-foreground font-mono">
-              {opportunity?.contract_value != null
-                ? `${opportunity.currency || "USD"} ${Number(opportunity.contract_value).toLocaleString()}`
-                : "Unspecified"}
-            </p>
-          </Card>
-        </div>
-
-        {/* ── Submission Readiness Score Card ───────────────── */}
-        <Card className="border border-border/80 shadow-panel bg-card">
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="h-5 w-5 text-accent" />
-                <div>
-                  <CardTitle className="font-display text-lg">Submission Readiness</CardTitle>
-                  <CardDescription className="text-xs">
-                    Deterministic readiness derived from application state only. AI does not
-                    determine this score.
-                  </CardDescription>
-                </div>
-              </div>
-              <div
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${readinessStatusBorder(status)}`}
+              {/* Deadline card */}
+              <Card
+                className={`border p-5 ${dl.urgencyLevel !== "none" ? ug.bg : "border-border/80 bg-card"}`}
               >
-                <span
-                  className={`font-display font-extrabold text-xl ${readinessStatusColor(status)}`}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground">
+                    Submission Deadline
+                  </span>
+                  <Timer className={`h-4 w-4 ${ug.color}`} />
+                </div>
+                <p
+                  className={`font-display font-bold text-lg ${dl.urgencyLevel !== "none" ? ug.color : "text-foreground"}`}
                 >
-                  {score}
-                </span>
-                <span
-                  className={`text-xs font-mono font-semibold uppercase ${readinessStatusColor(status)}`}
+                  {dl.deadline ? dl.deadline.toLocaleDateString() : "Not stated"}
+                </p>
+                <p className={`text-[11px] mt-0.5 font-mono ${ug.color}`}>
+                  {dl.isOverdue
+                    ? `Overdue by ${Math.abs(dl.daysRemaining ?? 0)} days`
+                    : dl.daysRemaining !== null
+                      ? `${dl.daysRemaining} day${dl.daysRemaining !== 1 ? "s" : ""} remaining`
+                      : "No deadline specified"}
+                </p>
+              </Card>
+
+              {/* Tasks progress */}
+              <Card className="border border-border/80 bg-card p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground">
+                    Tasks Completed
+                  </span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                </div>
+                <p className="font-display font-bold text-lg text-foreground">
+                  {readinessReport.completedTaskCount} / {readinessReport.totalTaskCount}
+                </p>
+                <div className="w-full bg-secondary h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${readinessReport.totalTaskCount > 0 ? (readinessReport.completedTaskCount / readinessReport.totalTaskCount) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </Card>
+
+              {/* Overdue tasks */}
+              <Card
+                className={`border p-5 ${dl.overdueTasks.length > 0 ? "border-destructive/30 bg-destructive/5" : "border-border/80 bg-card"}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground">
+                    Overdue Tasks
+                  </span>
+                  <AlertCircle
+                    className={`h-4 w-4 ${dl.overdueTasks.length > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                  />
+                </div>
+                <p
+                  className={`font-display font-bold text-lg ${dl.overdueTasks.length > 0 ? "text-destructive" : "text-foreground"}`}
                 >
-                  / 100 · {readinessStatusLabel(status)}
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4">
-            {/* Progress bar */}
-            <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${
-                  score >= 85
-                    ? "bg-emerald-500"
-                    : score >= 65
-                      ? "bg-blue-500"
-                      : score >= 30
-                        ? "bg-amber-500"
-                        : "bg-destructive"
-                }`}
-                style={{ width: `${score}%` }}
-              />
+                  {dl.overdueTasks.length}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {dl.tasksDueSoon.length > 0
+                    ? `+${dl.tasksDueSoon.length} due within 48h`
+                    : "No overdue tasks"}
+                </p>
+              </Card>
+
+              {/* Contract Value */}
+              <Card className="border border-border/80 bg-card p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground">
+                    Est. Contract Value
+                  </span>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="font-display font-bold text-lg text-foreground font-mono">
+                  {opportunity?.contract_value != null
+                    ? `${opportunity.currency || "USD"} ${Number(opportunity.contract_value).toLocaleString()}`
+                    : "Unspecified"}
+                </p>
+              </Card>
             </div>
 
-            {/* Breakdown */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                {
-                  label: "Mandatory Requirements",
-                  score: breakdown.mandatoryScore,
-                  max: 40,
-                  value: `${readinessReport.satisfiedMandatoryCount}/${readinessReport.mandatoryRequirementCount} met`,
-                },
-                {
-                  label: "Tasks Completed",
-                  score: breakdown.tasksScore,
-                  max: 30,
-                  value: `${readinessReport.completedTaskCount}/${readinessReport.totalTaskCount} done`,
-                },
-                {
-                  label: "Proposal Sections",
-                  score: breakdown.proposalsScore,
-                  max: 15,
-                  value: `${readinessReport.proposalCount} drafted`,
-                },
-                {
-                  label: "No Active Blockers",
-                  score: breakdown.noBlockersScore,
-                  max: 15,
-                  value: `${readinessReport.blockedTaskCount} blocked`,
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="p-3 rounded-xl border border-border/60 bg-surface/40 space-y-1.5"
-                >
-                  <p className="text-[10px] uppercase font-mono text-muted-foreground">
-                    {item.label}
-                  </p>
-                  <div className="flex items-end justify-between">
-                    <span className="font-display font-bold text-foreground">
-                      {item.score}
-                      <span className="text-[10px] text-muted-foreground font-normal">
-                        /{item.max}
-                      </span>
+            {/* ── Submission Readiness Score Card ───────────────── */}
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-5 w-5 text-accent" />
+                    <div>
+                      <CardTitle className="font-display text-lg">Submission Readiness</CardTitle>
+                      <CardDescription className="text-xs">
+                        Deterministic readiness derived from application state only. AI does not
+                        determine this score.
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${readinessStatusBorder(status)}`}
+                  >
+                    <span
+                      className={`font-display font-extrabold text-xl ${readinessStatusColor(status)}`}
+                    >
+                      {score}
+                    </span>
+                    <span
+                      className={`text-xs font-mono font-semibold uppercase ${readinessStatusColor(status)}`}
+                    >
+                      / 100 · {readinessStatusLabel(status)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground font-mono">{item.value}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                {/* Progress bar */}
+                <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      score >= 85
+                        ? "bg-emerald-500"
+                        : score >= 65
+                          ? "bg-blue-500"
+                          : score >= 30
+                            ? "bg-amber-500"
+                            : "bg-destructive"
+                    }`}
+                    style={{ width: `${score}%` }}
+                  />
+                </div>
 
-        {/* ── Critical Evidence Gaps ─────────────────────────── */}
-        {criticalGaps.length > 0 && (
-          <Card className="border border-destructive/30 bg-destructive/5 shadow-panel">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-display text-base flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                Critical Evidence Gaps ({criticalGaps.length})
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Mandatory requirements with no confirmed evidence or completed task. Each gap
-                reduces your readiness score.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-2">
-              {criticalGaps.slice(0, 6).map((gap) => (
-                <div
-                  key={gap.requirementId}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-destructive/20 bg-background/60"
-                >
-                  <div className="space-y-0.5 min-w-0">
-                    {gap.category && (
-                      <Badge variant="outline" className="text-[9px] font-mono mb-1">
-                        {gap.category}
-                      </Badge>
-                    )}
-                    <p className="text-xs text-foreground leading-snug line-clamp-2">
-                      {gap.requirement}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground font-mono">
-                      Evidence status: {gap.evidenceStatus ?? "not assessed"} ·{" "}
-                      {gap.linkedTaskId ? "task exists" : "no task linked"}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
-                    onClick={() => openTaskForGap(gap.requirementId, gap.requirement)}
-                  >
-                    <PlusCircle className="h-3 w-3 mr-1" /> Create Task
-                  </Button>
+                {/* Breakdown */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    {
+                      label: "Mandatory Requirements",
+                      score: breakdown.mandatoryScore,
+                      max: 40,
+                      value: `${readinessReport.satisfiedMandatoryCount}/${readinessReport.mandatoryRequirementCount} met`,
+                    },
+                    {
+                      label: "Tasks Completed",
+                      score: breakdown.tasksScore,
+                      max: 30,
+                      value: `${readinessReport.completedTaskCount}/${readinessReport.totalTaskCount} done`,
+                    },
+                    {
+                      label: "Proposal Sections",
+                      score: breakdown.proposalsScore,
+                      max: 15,
+                      value: `${readinessReport.proposalCount} drafted`,
+                    },
+                    {
+                      label: "No Active Blockers",
+                      score: breakdown.noBlockersScore,
+                      max: 15,
+                      value: `${readinessReport.blockedTaskCount} blocked`,
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="p-3 rounded-xl border border-border/60 bg-surface/40 space-y-1.5"
+                    >
+                      <p className="text-[10px] uppercase font-mono text-muted-foreground">
+                        {item.label}
+                      </p>
+                      <div className="flex items-end justify-between">
+                        <span className="font-display font-bold text-foreground">
+                          {item.score}
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            /{item.max}
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-mono">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {criticalGaps.length > 6 && (
-                <p className="text-xs text-muted-foreground text-center pt-1">
-                  +{criticalGaps.length - 6} more gaps — view the{" "}
-                  <Link
-                    to="/tenders/$id/requirements"
-                    params={{ id: id || "" }}
-                    className="text-accent underline"
-                  >
-                    Requirements Matrix
-                  </Link>{" "}
-                  for full coverage.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* ── Critical Evidence Gaps ─────────────────────────── */}
+            {criticalGaps.length > 0 && (
+              <Card className="border border-destructive/30 bg-destructive/5 shadow-panel">
+                <CardHeader className="pb-3">
+                  <CardTitle className="font-display text-base flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Critical Evidence Gaps ({criticalGaps.length})
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Mandatory requirements with no confirmed evidence or completed task. Each gap
+                    reduces your readiness score.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  {criticalGaps.slice(0, 6).map((gap) => (
+                    <div
+                      key={gap.requirementId}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-destructive/20 bg-background/60"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        {gap.category && (
+                          <Badge variant="outline" className="text-[9px] font-mono mb-1">
+                            {gap.category}
+                          </Badge>
+                        )}
+                        <p className="text-xs text-foreground leading-snug line-clamp-2">
+                          {gap.requirement}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          Evidence status: {gap.evidenceStatus ?? "not assessed"} ·{" "}
+                          {gap.linkedTaskId ? "task exists" : "no task linked"}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => openTaskForGap(gap.requirementId, gap.requirement)}
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" /> Create Task
+                      </Button>
+                    </div>
+                  ))}
+                  {criticalGaps.length > 6 && (
+                    <p className="text-xs text-muted-foreground text-center pt-1">
+                      +{criticalGaps.length - 6} more gaps — view the{" "}
+                      <Link
+                        to="/tenders/$id/requirements"
+                        params={{ id: id || "" }}
+                        className="text-accent underline"
+                      >
+                        Requirements Matrix
+                      </Link>{" "}
+                      for full coverage.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Task Board ─────────────────────────────────────── */}
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ListTodo className="h-5 w-5 text-accent" />
+                    <CardTitle className="font-display text-lg">Bid Deliverables & Tasks</CardTitle>
+                  </div>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {tasks.length} tasks
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {tasks.length === 0 ? (
+                  <div className="text-center p-8 border border-dashed rounded-xl space-y-2">
+                    <p className="text-xs text-muted-foreground font-mono">
+                      No tasks added to this bid workspace yet.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setNewTaskOpen(true)}
+                      className="text-xs"
+                    >
+                      <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add First Task
+                    </Button>
+                  </div>
+                ) : viewMode === "kanban" ? (
+                  /* ─── Kanban Board ─── */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {KANBAN_COLUMNS.map((col) => {
+                      const colTasks = tasks.filter((t) => t.status === col.key);
+                      return (
+                        <div key={col.key} className="space-y-2">
+                          <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                            <span
+                              className={`text-xs font-semibold font-mono uppercase ${col.color}`}
+                            >
+                              {col.label}
+                            </span>
+                            <Badge variant="secondary" className="text-[10px] font-mono">
+                              {colTasks.length}
+                            </Badge>
+                          </div>
+                          {colTasks.length === 0 ? (
+                            <div className="p-4 rounded-xl border border-dashed text-center text-[11px] text-muted-foreground">
+                              Empty
+                            </div>
+                          ) : (
+                            colTasks.map((t) => {
+                              const linkedReq = requirements.find((r) => r.id === t.requirement_id);
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="p-3 rounded-xl border border-border/60 bg-surface/50 space-y-2"
+                                >
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <PriorityBadge priority={t.priority} />
+                                    {t.due_date &&
+                                      new Date(t.due_date) < new Date() &&
+                                      t.status !== "completed" && (
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-[9px] font-mono"
+                                        >
+                                          OVERDUE
+                                        </Badge>
+                                      )}
+                                  </div>
+                                  <p className="text-xs font-semibold text-foreground leading-snug">
+                                    {t.title}
+                                  </p>
+                                  {linkedReq && (
+                                    <p className="text-[10px] text-accent font-mono flex items-center gap-1">
+                                      <FileCheck className="h-3 w-3" />
+                                      {linkedReq.requirement.slice(0, 40)}...
+                                    </p>
+                                  )}
+                                  {t.due_date && (
+                                    <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                      <Calendar className="h-3 w-3" />
+                                      {new Date(t.due_date).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                  <Select
+                                    value={t.status}
+                                    onValueChange={(val) =>
+                                      handleUpdateTaskStatus(
+                                        t.id,
+                                        val as "todo" | "in_progress" | "blocked" | "completed",
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="todo">To Do</SelectItem>
+                                      <SelectItem value="in_progress">In Progress</SelectItem>
+                                      <SelectItem value="blocked">Blocked</SelectItem>
+                                      <SelectItem value="completed">Completed</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* ─── List View ─── */
+                  <div className="space-y-2">
+                    {tasks.map((t) => {
+                      const linkedReq = requirements.find((r) => r.id === t.requirement_id);
+                      const isOverdueTask =
+                        t.due_date && new Date(t.due_date) < new Date() && t.status !== "completed";
+
+                      return (
+                        <div
+                          key={t.id}
+                          className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors ${
+                            t.status === "completed"
+                              ? "bg-surface/30 border-border/40 opacity-75"
+                              : t.status === "blocked"
+                                ? "bg-destructive/5 border-destructive/30"
+                                : "bg-surface/50 border-border/80"
+                          }`}
+                        >
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <PriorityBadge priority={t.priority} />
+                              <StatusBadge status={t.status} />
+                              {isOverdueTask && (
+                                <Badge variant="destructive" className="text-[9px] font-mono">
+                                  OVERDUE
+                                </Badge>
+                              )}
+                              <span
+                                className={`font-semibold text-sm ${
+                                  t.status === "completed"
+                                    ? "line-through text-muted-foreground"
+                                    : "text-foreground"
+                                }`}
+                              >
+                                {t.title}
+                              </span>
+                            </div>
+
+                            {t.description && (
+                              <p className="text-xs text-muted-foreground">{t.description}</p>
+                            )}
+
+                            {linkedReq && (
+                              <p className="text-[11px] text-accent flex items-center gap-1 font-mono">
+                                <FileCheck className="h-3 w-3" /> Linked:{" "}
+                                {linkedReq.requirement.slice(0, 60)}...
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            {t.due_date && (
+                              <span
+                                className={`text-xs font-mono flex items-center gap-1 ${
+                                  isOverdueTask ? "text-destructive" : "text-muted-foreground"
+                                }`}
+                              >
+                                <Calendar className="h-3.5 w-3.5" />
+                                {new Date(t.due_date).toLocaleDateString()}
+                              </span>
+                            )}
+
+                            <Select
+                              value={t.status}
+                              onValueChange={(val) =>
+                                handleUpdateTaskStatus(
+                                  t.id,
+                                  val as "todo" | "in_progress" | "blocked" | "completed",
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-32 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="todo">To Do</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="blocked">Blocked</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteTask(t.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ── Proposals & Notes ──────────────────────────────── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Workspace Notes */}
+              <Card className="border border-border/80 shadow-panel bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-display text-base">
+                      Strategy & Pursuit Notes
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveNotes}
+                      disabled={isSavingNotes}
+                      className="h-7 text-xs gap-1"
+                    >
+                      {isSavingNotes ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="h-3 w-3" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <Textarea
+                    rows={7}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Record win themes, competitor intelligence, executive sponsor commitments, and proposal team assignments..."
+                    className="text-xs font-mono leading-relaxed"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Proposal Documents */}
+              <Card className="border border-border/80 shadow-panel bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="font-display text-base">Proposal Preparation</CardTitle>
+                      <CardDescription className="text-xs">
+                        Draft sections & structured response deliverables.
+                      </CardDescription>
+                    </div>
+                    <Dialog open={newDocOpen} onOpenChange={setNewDocOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                          <PlusCircle className="h-3 w-3 mr-1" /> New Section
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <form onSubmit={handleCreateDocument}>
+                          <DialogHeader>
+                            <DialogTitle className="font-display text-lg">
+                              Add Proposal Section
+                            </DialogTitle>
+                            <DialogDescription className="text-xs">
+                              Draft a structured response section aligned to tender requirements.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-3 py-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Section Title</Label>
+                              <Input
+                                required
+                                value={docTitle}
+                                onChange={(e) => setDocTitle(e.target.value)}
+                                placeholder="e.g. Executive Summary & Value Proposition"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Draft Content</Label>
+                              <Textarea
+                                rows={6}
+                                value={docContent}
+                                onChange={(e) => setDocContent(e.target.value)}
+                                placeholder="Enter section draft..."
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button
+                              variant="outline"
+                              type="button"
+                              onClick={() => setNewDocOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={isCreatingDoc}>
+                              Save Draft
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  {proposals.length === 0 ? (
+                    <div className="p-6 text-center border border-dashed rounded-xl space-y-2">
+                      <FileText className="h-8 w-8 text-muted-foreground mx-auto" />
+                      <p className="text-xs text-muted-foreground">
+                        No proposal sections drafted yet. Each section drafted contributes to your
+                        readiness score.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        onClick={() => setNewDocOpen(true)}
+                      >
+                        <PlusCircle className="h-3.5 w-3.5 mr-1" /> Start Drafting
+                      </Button>
+                    </div>
+                  ) : (
+                    proposals.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3 rounded-lg border border-border/60 bg-surface/40 text-xs flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-accent shrink-0" />
+                          <span className="font-semibold text-foreground truncate">
+                            {doc.title}
+                          </span>
+                          <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                            v{doc.version}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
         )}
 
-        {/* ── Task Board ─────────────────────────────────────── */}
-        <Card className="border border-border/80 shadow-panel bg-card">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ListTodo className="h-5 w-5 text-accent" />
-                <CardTitle className="font-display text-lg">Bid Deliverables & Tasks</CardTitle>
-              </div>
-              <span className="text-xs text-muted-foreground font-mono">{tasks.length} tasks</span>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {tasks.length === 0 ? (
-              <div className="text-center p-8 border border-dashed rounded-xl space-y-2">
-                <p className="text-xs text-muted-foreground font-mono">
-                  No tasks added to this bid workspace yet.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setNewTaskOpen(true)}
-                  className="text-xs"
-                >
-                  <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add First Task
-                </Button>
-              </div>
-            ) : viewMode === "kanban" ? (
-              /* ─── Kanban Board ─── */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {KANBAN_COLUMNS.map((col) => {
-                  const colTasks = tasks.filter((t) => t.status === col.key);
-                  return (
-                    <div key={col.key} className="space-y-2">
-                      <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                        <span className={`text-xs font-semibold font-mono uppercase ${col.color}`}>
-                          {col.label}
-                        </span>
-                        <Badge variant="secondary" className="text-[10px] font-mono">
-                          {colTasks.length}
-                        </Badge>
-                      </div>
-                      {colTasks.length === 0 ? (
-                        <div className="p-4 rounded-xl border border-dashed text-center text-[11px] text-muted-foreground">
-                          Empty
-                        </div>
-                      ) : (
-                        colTasks.map((t) => {
-                          const linkedReq = requirements.find((r) => r.id === t.requirement_id);
-                          return (
-                            <div
-                              key={t.id}
-                              className="p-3 rounded-xl border border-border/60 bg-surface/50 space-y-2"
-                            >
-                              <div className="flex flex-wrap gap-1.5">
-                                <PriorityBadge priority={t.priority} />
-                                {t.due_date &&
-                                  new Date(t.due_date) < new Date() &&
-                                  t.status !== "completed" && (
-                                    <Badge variant="destructive" className="text-[9px] font-mono">
-                                      OVERDUE
-                                    </Badge>
-                                  )}
-                              </div>
-                              <p className="text-xs font-semibold text-foreground leading-snug">
-                                {t.title}
-                              </p>
-                              {linkedReq && (
-                                <p className="text-[10px] text-accent font-mono flex items-center gap-1">
-                                  <FileCheck className="h-3 w-3" />
-                                  {linkedReq.requirement.slice(0, 40)}...
-                                </p>
-                              )}
-                              {t.due_date && (
-                                <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                  <Calendar className="h-3 w-3" />
-                                  {new Date(t.due_date).toLocaleDateString()}
-                                </p>
-                              )}
-                              <Select
-                                value={t.status}
-                                onValueChange={(val) =>
-                                  handleUpdateTaskStatus(
-                                    t.id,
-                                    val as "todo" | "in_progress" | "blocked" | "completed",
-                                  )
-                                }
-                              >
-                                <SelectTrigger className="h-7 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="todo">To Do</SelectItem>
-                                  <SelectItem value="in_progress">In Progress</SelectItem>
-                                  <SelectItem value="blocked">Blocked</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* ─── List View ─── */
-              <div className="space-y-2">
-                {tasks.map((t) => {
-                  const linkedReq = requirements.find((r) => r.id === t.requirement_id);
-                  const isOverdueTask =
-                    t.due_date && new Date(t.due_date) < new Date() && t.status !== "completed";
+        {activeTab === "proposal" && (
+          <ProposalWorkspaceTab
+            opportunityId={id || ""}
+            workspaceId={workspace?.id || ""}
+            opportunityTitle={opportunity?.title}
+          />
+        )}
 
-                  return (
-                    <div
-                      key={t.id}
-                      className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors ${
-                        t.status === "completed"
-                          ? "bg-surface/30 border-border/40 opacity-75"
-                          : t.status === "blocked"
-                            ? "bg-destructive/5 border-destructive/30"
-                            : "bg-surface/50 border-border/80"
-                      }`}
-                    >
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <PriorityBadge priority={t.priority} />
-                          <StatusBadge status={t.status} />
-                          {isOverdueTask && (
-                            <Badge variant="destructive" className="text-[9px] font-mono">
-                              OVERDUE
-                            </Badge>
-                          )}
-                          <span
-                            className={`font-semibold text-sm ${
-                              t.status === "completed"
-                                ? "line-through text-muted-foreground"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {t.title}
-                          </span>
-                        </div>
+        {activeTab === "compliance" && (
+          <ComplianceAuditTab opportunityId={id || ""} workspaceId={workspace?.id || ""} />
+        )}
 
-                        {t.description && (
-                          <p className="text-xs text-muted-foreground">{t.description}</p>
-                        )}
+        {activeTab === "submission" && (
+          <SubmissionTrackingTab
+            opportunityId={id || ""}
+            workspaceId={workspace?.id || ""}
+            contractCurrency={opportunity?.currency ?? null}
+            contractValue={opportunity?.contract_value ?? null}
+          />
+        )}
 
-                        {linkedReq && (
-                          <p className="text-[11px] text-accent flex items-center gap-1 font-mono">
-                            <FileCheck className="h-3 w-3" /> Linked:{" "}
-                            {linkedReq.requirement.slice(0, 60)}...
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0">
-                        {t.due_date && (
-                          <span
-                            className={`text-xs font-mono flex items-center gap-1 ${
-                              isOverdueTask ? "text-destructive" : "text-muted-foreground"
-                            }`}
-                          >
-                            <Calendar className="h-3.5 w-3.5" />
-                            {new Date(t.due_date).toLocaleDateString()}
-                          </span>
-                        )}
-
-                        <Select
-                          value={t.status}
-                          onValueChange={(val) =>
-                            handleUpdateTaskStatus(
-                              t.id,
-                              val as "todo" | "in_progress" | "blocked" | "completed",
-                            )
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-32 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="todo">To Do</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="blocked">Blocked</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteTask(t.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ── Proposals & Notes ──────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Workspace Notes */}
-          <Card className="border border-border/80 shadow-panel bg-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-display text-base">Strategy & Pursuit Notes</CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSaveNotes}
-                  disabled={isSavingNotes}
-                  className="h-7 text-xs gap-1"
-                >
-                  {isSavingNotes ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Save className="h-3 w-3" />
-                  )}
-                  Save
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Textarea
-                rows={7}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Record win themes, competitor intelligence, executive sponsor commitments, and proposal team assignments..."
-                className="text-xs font-mono leading-relaxed"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Proposal Documents */}
-          <Card className="border border-border/80 shadow-panel bg-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-display text-base">Proposal Preparation</CardTitle>
-                  <CardDescription className="text-xs">
-                    Draft sections & structured response deliverables.
-                  </CardDescription>
-                </div>
-                <Dialog open={newDocOpen} onOpenChange={setNewDocOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-7 text-xs">
-                      <PlusCircle className="h-3 w-3 mr-1" /> New Section
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <form onSubmit={handleCreateDocument}>
-                      <DialogHeader>
-                        <DialogTitle className="font-display text-lg">
-                          Add Proposal Section
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                          Draft a structured response section aligned to tender requirements.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-3 py-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Section Title</Label>
-                          <Input
-                            required
-                            value={docTitle}
-                            onChange={(e) => setDocTitle(e.target.value)}
-                            placeholder="e.g. Executive Summary & Value Proposition"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Draft Content</Label>
-                          <Textarea
-                            rows={6}
-                            value={docContent}
-                            onChange={(e) => setDocContent(e.target.value)}
-                            placeholder="Enter section draft..."
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          type="button"
-                          onClick={() => setNewDocOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={isCreatingDoc}>
-                          Save Draft
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-2">
-              {proposals.length === 0 ? (
-                <div className="p-6 text-center border border-dashed rounded-xl space-y-2">
-                  <FileText className="h-8 w-8 text-muted-foreground mx-auto" />
-                  <p className="text-xs text-muted-foreground">
-                    No proposal sections drafted yet. Each section drafted contributes to your
-                    readiness score.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                    onClick={() => setNewDocOpen(true)}
-                  >
-                    <PlusCircle className="h-3.5 w-3.5 mr-1" /> Start Drafting
-                  </Button>
-                </div>
-              ) : (
-                proposals.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="p-3 rounded-lg border border-border/60 bg-surface/40 text-xs flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="h-4 w-4 text-accent shrink-0" />
-                      <span className="font-semibold text-foreground truncate">{doc.title}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                        v{doc.version}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                      {new Date(doc.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </>
-    )}
-
-    {activeTab === "proposal" && (
-      <ProposalWorkspaceTab
-        opportunityId={id || ""}
-        workspaceId={workspace?.id || ""}
-        opportunityTitle={opportunity?.title}
-      />
-    )}
-
-    {activeTab === "compliance" && (
-      <ComplianceAuditTab
-        opportunityId={id || ""}
-        workspaceId={workspace?.id || ""}
-      />
-    )}
-
-    {activeTab === "submission" && (
-      <SubmissionTrackingTab
-        opportunityId={id || ""}
-        workspaceId={workspace?.id || ""}
-        contractCurrency={opportunity?.currency ?? null}
-        contractValue={opportunity?.contract_value ?? null}
-      />
-    )}
-
-    {activeTab === "outcomes" && (
-      <OutcomesLearningTab
-        opportunityId={id || ""}
-        workspaceId={workspace?.id || ""}
-        contractCurrency={opportunity?.currency ?? null}
-        contractValue={opportunity?.contract_value ?? null}
-      />
-    )}
-  </div>
-</AppShell>
+        {activeTab === "outcomes" && (
+          <OutcomesLearningTab
+            opportunityId={id || ""}
+            workspaceId={workspace?.id || ""}
+            contractCurrency={opportunity?.currency ?? null}
+            contractValue={opportunity?.contract_value ?? null}
+          />
+        )}
+      </div>
+    </AppShell>
   );
 }

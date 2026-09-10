@@ -115,7 +115,9 @@ export function ComplianceAuditTab({ opportunityId, workspaceId }: ComplianceAud
     return true;
   });
 
-  const criticalCount = findings.filter((f) => f.severity === "critical" && f.status === "open").length;
+  const criticalCount = findings.filter(
+    (f) => f.severity === "critical" && f.status === "open",
+  ).length;
   const highCount = findings.filter((f) => f.severity === "high" && f.status === "open").length;
   const openCount = findings.filter((f) => f.status === "open").length;
   const score = audit?.readiness_score ?? null;
@@ -337,7 +339,9 @@ export function ComplianceAuditTab({ opportunityId, workspaceId }: ComplianceAud
                             </span>
                           )}
                         </div>
-                        <p className="text-xs font-semibold text-foreground pt-1">{f.requirement}</p>
+                        <p className="text-xs font-semibold text-foreground pt-1">
+                          {f.requirement}
+                        </p>
                       </div>
 
                       {/* Status Dropdown */}

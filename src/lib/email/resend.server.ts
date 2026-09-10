@@ -29,6 +29,7 @@ async function sendViaResend(params: {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string | undefined;
 }): Promise<SendEmailResult> {
   const apiKey = getResendApiKey();
   if (!apiKey) {
@@ -39,19 +40,29 @@ async function sendViaResend(params: {
   }
 
   try {
+    const payload: {
+      from: string;
+      to: string[];
+      subject: string;
+      html: string;
+      text?: string;
+      reply_to?: string;
+    } = {
+      from: getFromAddress(),
+      to: [params.to],
+      subject: params.subject,
+      html: params.html,
+      ...(params.text ? { text: params.text } : {}),
+      ...(params.replyTo ? { reply_to: params.replyTo } : {}),
+    };
+
     const response = await fetch(RESEND_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        from: getFromAddress(),
-        to: [params.to],
-        subject: params.subject,
-        html: params.html,
-        text: params.text,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -226,4 +237,294 @@ export async function sendMemberInvitationEmail(params: {
   `;
 
   return sendViaResend({ to: params.toEmail, subject, text, html });
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Sends a visitor contact form inquiry to the configured GetBidRadar support/contact recipient.
+ * Sets replyTo to the visitor's verified email so support can reply directly.
+ */
+export async function sendContactMessageEmail(params: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}): Promise<SendEmailResult> {
+  const recipient =
+    process.env["CONTACT_EMAIL"] ||
+    process.env["RESEND_TO_EMAIL"] ||
+    process.env["SUPPORT_EMAIL"] ||
+    "support@getbidradar.com";
+
+  const emailSubject = `[Contact Inquiry] ${params.subject.trim()}`;
+  const text = `New Contact Form Inquiry from GetBidRadar\n\nName: ${params.name.trim()}\nEmail: ${params.email.trim()}\nSubject: ${params.subject.trim()}\n\nMessage:\n${params.message.trim()}\n\n---\nSent via GetBidRadar contact form. Reply directly to this email to respond.`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 20px; border-bottom: 1px solid #E4E7EC;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 22px;">GetBidRadar</h2>
+        <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Inbound Contact Inquiry</p>
+      </div>
+      <div style="padding: 24px 0;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #667085; width: 80px;">From:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #101828;">${escapeHtml(params.name)} &lt;${escapeHtml(params.email)}&gt;</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #667085;">Subject:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #101828;">${escapeHtml(params.subject)}</td>
+          </tr>
+        </table>
+        <div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #1F2937;">
+${escapeHtml(params.message)}
+        </div>
+        <p style="font-size: 12px; color: #667085; margin-top: 16px;">
+          Reply directly to this email to respond to <strong>${escapeHtml(params.email)}</strong>.
+        </p>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar Contact Infrastructure
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({
+    to: recipient,
+    subject: emailSubject,
+    text,
+    html,
+    replyTo: params.email.trim(),
+  });
+}
+
+/**
+ * Sends a customer support ticket inquiry to the configured support team.
+ */
+export async function sendSupportTicketEmail(params: {
+  name: string;
+  email: string;
+  category: string;
+  priority?: string;
+  subject: string;
+  message: string;
+  ticketId: string;
+}): Promise<SendEmailResult> {
+  const recipient =
+    process.env["SUPPORT_EMAIL"] ||
+    process.env["CONTACT_EMAIL"] ||
+    process.env["RESEND_TO_EMAIL"] ||
+    "support@getbidradar.com";
+
+  const priorityLabel = params.priority || "Normal";
+  const emailSubject = `[Support Ticket #${params.ticketId}] [${params.category}] ${params.subject.trim()}`;
+  const text = `New Support Ticket #${params.ticketId}\n\nCategory: ${params.category}\nPriority: ${priorityLabel}\nFrom: ${params.name} <${params.email}>\nSubject: ${params.subject}\n\nDescription:\n${params.message}\n\n---\nReply directly to this email to respond to the ticket creator.`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 16px; border-bottom: 2px solid #0052CC;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 20px;">GetBidRadar Support Desk</h2>
+        <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Ticket Reference: <strong>#${escapeHtml(params.ticketId)}</strong></p>
+      </div>
+      <div style="padding: 20px 0;">
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <span style="background-color: #EFF8FF; color: #175CD3; border: 1px solid #B2DDFF; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+            ${escapeHtml(params.category)}
+          </span>
+          <span style="background-color: #F8F9FA; color: #344054; border: 1px solid #D0D5DD; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+            Priority: ${escapeHtml(priorityLabel)}
+          </span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #667085; width: 80px;">Submitter:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #101828;">${escapeHtml(params.name)} &lt;${escapeHtml(params.email)}&gt;</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #667085;">Subject:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #101828;">${escapeHtml(params.subject)}</td>
+          </tr>
+        </table>
+        <div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #1F2937;">
+${escapeHtml(params.message)}
+        </div>
+        <p style="font-size: 12px; color: #667085; margin-top: 16px;">
+          Reply directly to this email to communicate with <strong>${escapeHtml(params.email)}</strong>.
+        </p>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar Support Operations
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({
+    to: recipient,
+    subject: emailSubject,
+    text,
+    html,
+    replyTo: params.email.trim(),
+  });
+}
+
+/**
+ * Sends a notification when a tender analysis finishes.
+ */
+export async function sendAnalysisCompleteEmail(params: {
+  to: string;
+  tenderTitle: string;
+  score: number;
+  recommendation: string;
+  url: string;
+}): Promise<SendEmailResult> {
+  const badgeColor =
+    params.recommendation === "BID"
+      ? "#12B76A"
+      : params.recommendation === "REVIEW"
+      ? "#F79009"
+      : "#F04438";
+
+  const subject = `[Tender Analysis Complete] ${params.recommendation}: ${params.tenderTitle}`;
+  const text = `Tender Analysis Complete\n\nTender: ${params.tenderTitle}\nDeterministic Score: ${params.score}/100\nRecommendation: ${params.recommendation}\n\nReview the qualification report and requirement breakdown:\n${params.url}\n\nGetBidRadar Intelligence Engine`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 16px; border-bottom: 1px solid #E4E7EC;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 20px;">GetBidRadar</h2>
+        <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Tender Analysis Notification</p>
+      </div>
+      <div style="padding: 24px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #101828;">
+          ${escapeHtml(params.tenderTitle)}
+        </h3>
+        <div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">
+          <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #667085; margin-bottom: 6px;">
+            Deterministic Qualification Recommendation
+          </div>
+          <div style="display: inline-block; padding: 6px 16px; border-radius: 20px; background-color: ${badgeColor}15; color: ${badgeColor}; font-weight: 800; font-size: 18px; letter-spacing: 0.05em; margin-bottom: 12px;">
+            ${escapeHtml(params.recommendation)}
+          </div>
+          <div style="font-size: 14px; color: #344054;">
+            Calculated Compliance Score: <strong style="color: #101828; font-size: 16px;">${params.score}/100</strong>
+          </div>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${escapeHtml(params.url)}" style="background-color: #0052CC; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+            Open Qualification Workspace →
+          </a>
+        </div>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar. Enterprise Tender Intelligence.
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({ to: params.to, subject, text, html });
+}
+
+/**
+ * Sends a confirmation email when a tender submission is recorded.
+ */
+export async function sendSubmissionConfirmationEmail(params: {
+  to: string;
+  tenderTitle: string;
+  submissionDate: string;
+  referenceNumber?: string;
+  url: string;
+}): Promise<SendEmailResult> {
+  const subject = `[Submission Recorded] ${params.tenderTitle}`;
+  const text = `Tender Submission Recorded\n\nTender: ${params.tenderTitle}\nDate: ${params.submissionDate}\n${params.referenceNumber ? `Reference: ${params.referenceNumber}\n` : ""}\nView submission record:\n${params.url}\n\nGetBidRadar Intelligence Engine`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 16px; border-bottom: 1px solid #E4E7EC;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 20px;">GetBidRadar</h2>
+        <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Submission Confirmation</p>
+      </div>
+      <div style="padding: 24px 0;">
+        <h3 style="margin: 0 0 12px 0; font-size: 18px; color: #101828;">
+          Submission Logged: ${escapeHtml(params.tenderTitle)}
+        </h3>
+        <p style="font-size: 14px; color: #344054; line-height: 1.6;">
+          Your formal proposal submission has been recorded in the workspace audit log on <strong>${escapeHtml(params.submissionDate)}</strong>.
+        </p>
+        ${
+          params.referenceNumber
+            ? `<div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; font-mono: monospace;">
+                <strong>Receipt Reference:</strong> ${escapeHtml(params.referenceNumber)}
+               </div>`
+            : ""
+        }
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${escapeHtml(params.url)}" style="background-color: #0052CC; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+            View Bid Workspace →
+          </a>
+        </div>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar. Enterprise Tender Intelligence.
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({ to: params.to, subject, text, html });
+}
+
+/**
+ * Sends a deadline reminder email (7-day, 3-day, or 24-hour).
+ */
+export async function sendDeadlineReminderEmail(params: {
+  to: string;
+  tenderTitle: string;
+  daysRemaining: number;
+  deadline: string;
+  url: string;
+}): Promise<SendEmailResult> {
+  const urgencyLabel =
+    params.daysRemaining <= 1
+      ? "CRITICAL (24 Hours Remaining)"
+      : `${params.daysRemaining} Days Remaining`;
+
+  const subject = `[Tender Deadline Alert] ${urgencyLabel}: ${params.tenderTitle}`;
+  const text = `Tender Deadline Reminder\n\nTender: ${params.tenderTitle}\nTime Remaining: ${urgencyLabel}\nSubmission Deadline: ${params.deadline}\n\nAccess your workspace to finalize submission:\n${params.url}\n\nGetBidRadar Intelligence Engine`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
+      <div style="padding-bottom: 16px; border-bottom: 2px solid #F04438;">
+        <h2 style="margin: 0; color: #0B1220; font-size: 20px;">GetBidRadar</h2>
+        <p style="margin: 4px 0 0; color: #D92D20; font-size: 13px; font-weight: 600;">Deadline Warning Alert</p>
+      </div>
+      <div style="padding: 24px 0;">
+        <h3 style="margin: 0 0 12px 0; font-size: 18px; color: #101828;">
+          ${escapeHtml(params.tenderTitle)}
+        </h3>
+        <div style="background-color: #FEF3F2; border: 1px solid #FECDCA; border-radius: 8px; padding: 16px; margin: 16px 0; color: #B42318; font-size: 14px;">
+          <strong>Urgency:</strong> ${escapeHtml(urgencyLabel)}<br/>
+          <strong>Submission Deadline:</strong> ${escapeHtml(params.deadline)}
+        </div>
+        <p style="font-size: 14px; color: #344054; line-height: 1.6;">
+          Please review your proposal completeness, compliance certificates, and mandatory bid forms before the submission window closes.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${escapeHtml(params.url)}" style="background-color: #D92D20; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+            Open Proposal Workspace Now →
+          </a>
+        </div>
+      </div>
+      <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
+        © ${new Date().getFullYear()} GetBidRadar Deadline Intelligence
+      </div>
+    </div>
+  `;
+
+  return sendViaResend({ to: params.to, subject, text, html });
 }

@@ -13,9 +13,7 @@ import {
 
 export const runComplianceAuditFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
-    z.object({ opportunityId: z.string().uuid() }).parse(data),
-  )
+  .validator((data: unknown) => z.object({ opportunityId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { data: opp } = await context.supabase
       .from("opportunities")
@@ -50,9 +48,7 @@ export const updateFindingStatusFn = createServerFn({ method: "POST" })
 export const getLatestAuditFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) =>
-    z
-      .object({ opportunityId: z.string().uuid(), workspaceId: z.string().uuid() })
-      .parse(data),
+    z.object({ opportunityId: z.string().uuid(), workspaceId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
     return getLatestAudit(context.supabase, data.workspaceId, data.opportunityId);

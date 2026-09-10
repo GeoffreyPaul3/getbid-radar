@@ -421,7 +421,9 @@ export async function verifyAndActivatePayChanguPayment(params: {
   }
 
   // Update workspace plan, subscription status, and authoritative billing period
-  const periodEnd = new Date(new Date(activationTime).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const periodEnd = new Date(
+    new Date(activationTime).getTime() + 30 * 24 * 60 * 60 * 1000,
+  ).toISOString();
   const { error: updateWsErr } = await supabase
     .from("workspaces")
     .update({

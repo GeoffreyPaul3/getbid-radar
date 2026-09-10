@@ -44,7 +44,8 @@ export const recordSubmissionFn = createServerFn({ method: "POST" })
     } = {
       submission_method: data.submission_method,
     };
-    if (data.confirmation_number !== undefined) payload.confirmation_number = data.confirmation_number;
+    if (data.confirmation_number !== undefined)
+      payload.confirmation_number = data.confirmation_number;
     if (data.notes !== undefined) payload.notes = data.notes;
     if (data.submitted_at !== undefined) payload.submitted_at = data.submitted_at;
     if (data.bid_price !== undefined) payload.bid_price = data.bid_price;

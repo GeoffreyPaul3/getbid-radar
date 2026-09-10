@@ -1,9 +1,22 @@
-import React from "react";
+import React, { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { PublicLayout } from "@/components/layout/PublicLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  PLAN_CONFIGS,
+  PURCHASABLE_PLANS,
+  formatBillingAmount,
+  type BillingCurrency,
+} from "@/lib/billing/plans";
 import logo from "@/assets/bidradar.png";
 import {
   Radar,
@@ -32,61 +45,10 @@ export const Route = createFileRoute("/")({
 function LandingPage() {
   const { user } = useAuth();
   const { workspace } = useWorkspace();
+  const [currency, setCurrency] = useState<BillingCurrency>("USD");
 
   return (
-    <div className="min-h-screen bg-canvas text-foreground font-sans antialiased selection:bg-primary-soft selection:text-primary">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-surface/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <img src={logo} width={140} height={110} alt="BidRadar" />
-            </Link>
-            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-text-secondary">
-              <a href="#problem" className="hover:text-foreground transition-colors">
-                The Problem
-              </a>
-              <a href="#how-it-works" className="hover:text-foreground transition-colors">
-                How It Works
-              </a>
-              <a href="#qualification" className="hover:text-foreground transition-colors">
-                Qualification
-              </a>
-              <a href="#trust" className="hover:text-foreground transition-colors">
-                Enterprise Trust
-              </a>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-bright shadow-subtle transition-all duration-150"
-              >
-                <span>Dashboard ({workspace?.name || "Workspace"})</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="px-3.5 py-2 rounded-lg text-xs font-medium text-text-secondary hover:text-foreground transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/tenders/new"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-bright shadow-subtle transition-all duration-150 active:scale-[0.98]"
-                >
-                  <span>Analyze a Tender</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+    <PublicLayout>
 
       {/* Hero Section */}
       <section className="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
@@ -525,11 +487,231 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 lg:py-28 border-t border-border bg-surface/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/25 bg-primary-soft text-primary text-xs font-mono font-semibold uppercase tracking-wider mb-4">
+              <Sparkles className="h-3.5 w-3.5" /> Commercial Plans
+            </div>
+            <h2 className="font-display font-bold text-3xl sm:text-4xl text-foreground tracking-tight mb-4">
+              Transparent, Value-Aligned Pricing
+            </h2>
+            <p className="text-sm sm:text-base text-text-secondary leading-relaxed">
+              Scale your tender evaluation capacity without per-user penalties. Win more contracts with deterministic qualification rigor.
+            </p>
+
+            {/* Currency Switcher */}
+            <div className="mt-8 inline-flex items-center rounded-lg border border-border bg-surface p-1 shadow-subtle">
+              <button
+                type="button"
+                onClick={() => setCurrency("USD")}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  currency === "USD"
+                    ? "bg-primary text-white shadow-xs"
+                    : "text-text-secondary hover:text-foreground"
+                }`}
+              >
+                USD ($)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrency("MWK")}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  currency === "MWK"
+                    ? "bg-primary text-white shadow-xs"
+                    : "text-text-secondary hover:text-foreground"
+                }`}
+              >
+                Malawian Kwacha (MWK)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            {PURCHASABLE_PLANS.map((tierKey) => {
+              const plan = PLAN_CONFIGS[tierKey];
+              const isPopular = plan.highlighted;
+
+              return (
+                <div
+                  key={tierKey}
+                  className={`flex flex-col rounded-2xl border transition-all duration-200 relative ${
+                    isPopular
+                      ? "border-primary bg-surface shadow-panel ring-2 ring-primary/20"
+                      : "border-border bg-surface/80 shadow-subtle hover:border-border/80"
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <span className="px-3.5 py-1 rounded-full bg-primary text-white text-[11px] font-mono font-semibold uppercase tracking-wider shadow-sm">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-6 sm:p-8 flex-1 flex flex-col">
+                    <div className="mb-6">
+                      <h3 className="font-display font-bold text-xl text-foreground">
+                        {plan.name}
+                      </h3>
+                      <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">
+                        {plan.description}
+                      </p>
+                    </div>
+
+                    <div className="mb-6 pb-6 border-b border-border/80">
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-display font-extrabold text-3xl sm:text-4xl text-foreground">
+                          {formatBillingAmount(plan.monthlyPrice[currency], currency)}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          / month
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-mono mt-1">
+                        {plan.analysisAllowance === -1
+                          ? "Unlimited tender evaluations"
+                          : `${plan.analysisAllowance} tender evaluations / mo`}
+                      </p>
+                    </div>
+
+                    <ul className="space-y-3 mb-8 flex-1 text-xs">
+                      {plan.features.map((feat, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 text-foreground">
+                          <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="pt-2">
+                      <Link
+                        to="/login"
+                        className={`w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold transition-all ${
+                          isPopular
+                            ? "bg-primary text-white hover:bg-primary-bright shadow-sm"
+                            : "bg-surface border border-border text-foreground hover:bg-surface-muted"
+                        }`}
+                      >
+                        <span>Select {plan.name}</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Evaluation Callout Banner */}
+          <div className="mt-12 p-6 rounded-2xl border border-primary/20 bg-primary-soft/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+            <div className="space-y-1">
+              <h4 className="font-display font-bold text-sm text-foreground">
+                Evaluating for an enterprise bid team?
+              </h4>
+              <p className="text-xs text-text-secondary">
+                Every new workspace includes a 14-day commercial pilot with 3 full tender qualifications and evidence cross-referencing.
+              </p>
+            </div>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-bright shrink-0"
+            >
+              <span>Start Free Pilot</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-20 border-t border-border bg-canvas">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/25 bg-primary-soft text-primary text-xs font-mono font-semibold uppercase tracking-wider mb-4">
+              <HelpCircle className="h-3.5 w-3.5" /> Common Questions
+            </div>
+            <h2 className="font-display font-bold text-3xl text-foreground tracking-tight">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-sm text-text-secondary mt-2">
+              Everything you need to know about deterministic tender intelligence.
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="w-full space-y-3">
+            <AccordionItem value="item-1" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                How does the deterministic scoring engine make qualification decisions?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                Unlike general chat models that guess or produce probabilistic summaries, GetBidRadar uses an immutable mathematical engine as the sole authority. Mandatory requirements are extracted into structured parameters (financial turnover thresholds, ISO certifications, technical credentials, local registration) and evaluated against your verified corporate evidence base. A score from 0 to 100 is computed, delivering a transparent BID, REVIEW, or NO-BID decision where every single point is backed by audited document citations.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-2" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                Can the system hallucinate qualifications or tender requirements?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                No. Our architecture strictly separates AI extraction from evaluation authority. When the AI parses tender specifications, it must output typed JSON validated against strict runtime Zod schemas. If a qualification is missing or ambiguous in your corporate evidence, the scoring engine marks it explicitly as UNKNOWN or FAIL — it will never fabricate credentials.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                What file types and tender sizes are supported?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                GetBidRadar supports scanned and native PDF documents, Microsoft Word files (.docx), and public RFP web links. Documents up to 50 MB and 300+ pages are handled through our multi-phase chunking and optical character recognition (OCR) engine.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                Is our company data and evidence base confidential?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                Yes, completely. We enforce database-level PostgreSQL Row Level Security (RLS) on every table and isolated cryptographic storage paths per workspace. Your bidding history, past performance summaries, and staff qualifications cannot be accessed or viewed by any other tenant or user. Furthermore, your data is never used to train public AI models.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                Which payment methods and currencies do you support?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                Through our integration with PayChangu, we accept major credit and debit cards, mobile money transfers (Airtel Money, Mpamba), and direct bank transfers. We natively support Malawian Kwacha (MWK) and US Dollars (USD).
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                How do deadline reminders and automated alerts work?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                When you mark a tender as "Pursuing" or "Preparing", the system schedules automated reminders at 7 days, 3 days, and 24 hours prior to the submission deadline. Alerts are delivered via email and posted to your workspace notification center so your team never misses a critical tender closing.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7" className="border border-border rounded-xl px-5 bg-surface shadow-subtle">
+              <AccordionTrigger className="text-sm font-semibold text-foreground py-4 hover:no-underline">
+                Can our entire proposal and estimating team work together?
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-text-secondary leading-relaxed pb-4">
+                Yes. Workspaces support multiple team members with role-based access control (Owner, Admin, Member, Reviewer). You can invite colleagues by email, assign proposal sections, track readiness metrics, and collaborate in real time.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      </section>
+
       {/* Bottom CTA */}
       <section className="py-20 border-t border-border bg-surface">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center justify-center  mb-6 ">
-            <img src={logo} width={140} height={110} alt="BidRadar" />
+          <div className="inline-flex items-center justify-center mb-6">
+            <img src={logo} width={140} height={120} alt="BidRadar" />
           </div>
           <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-foreground tracking-tight mb-4">
             Evaluate your next contract with decision intelligence.
@@ -549,20 +731,6 @@ function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="py-8 border-t border-border bg-canvas text-xs text-muted-foreground">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Link to="/" className="flex items-center">
-              <img src={logo} width={140} height={130} alt="BidRadar" />
-            </Link>
-
-            <span>— Enterprise Contract Intelligence Engine</span>
-          </div>
-          <p>© {new Date().getFullYear()} GetBidRadar. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+    </PublicLayout>
   );
 }

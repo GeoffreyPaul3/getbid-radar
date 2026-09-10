@@ -82,9 +82,7 @@ function AnalyticsPage() {
   const { data: analytics, isLoading } = useQuery({
     queryKey: ["analytics", workspace?.id],
     queryFn: () =>
-      workspace?.id
-        ? getWorkspaceAnalyticsFn({ data: { workspaceId: workspace.id } })
-        : null,
+      workspace?.id ? getWorkspaceAnalyticsFn({ data: { workspaceId: workspace.id } }) : null,
     enabled: !!workspace?.id,
     staleTime: 60_000,
   });
@@ -94,7 +92,11 @@ function AnalyticsPage() {
         { name: "BID", value: analytics.bidDecisions, fill: "#6366f1" },
         { name: "REVIEW", value: analytics.reviewDecisions, fill: "#f59e0b" },
         { name: "NO-BID", value: analytics.noBidDecisions, fill: "#ef4444" },
-        { name: "Pending", value: analytics.totalOpportunities - analytics.analysisComplete, fill: "#94a3b8" },
+        {
+          name: "Pending",
+          value: analytics.totalOpportunities - analytics.analysisComplete,
+          fill: "#94a3b8",
+        },
       ].filter((d) => d.value > 0)
     : [];
 
@@ -276,9 +278,7 @@ function AnalyticsPage() {
 
               {/* Win Rate by Category */}
               <div className="bg-surface border border-border rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-foreground mb-4">
-                  Win Rate by Category
-                </h2>
+                <h2 className="text-sm font-semibold text-foreground mb-4">Win Rate by Category</h2>
                 {!analytics || analytics.winRateByCategory.length === 0 ? (
                   <EmptyState message="Record bid outcomes across categories to see win rate breakdown" />
                 ) : (
@@ -310,13 +310,21 @@ function AnalyticsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard
                   label="Avg. Qualification Score"
-                  value={analytics?.averageQualificationScore != null ? `${analytics.averageQualificationScore}` : "—"}
+                  value={
+                    analytics?.averageQualificationScore != null
+                      ? `${analytics.averageQualificationScore}`
+                      : "—"
+                  }
                   icon={TrendingUp}
                   sub="Across all analyzed tenders"
                 />
                 <StatCard
                   label="Avg. Preparation Days"
-                  value={analytics?.averagePreparationDays != null ? `${analytics.averagePreparationDays}d` : "—"}
+                  value={
+                    analytics?.averagePreparationDays != null
+                      ? `${analytics.averagePreparationDays}d`
+                      : "—"
+                  }
                   icon={Clock}
                   sub="Intake to submission"
                 />

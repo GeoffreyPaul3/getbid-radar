@@ -7,6 +7,7 @@ import {
   calculateProposalCompleteness,
   listProposalSections,
   exportProposal,
+  deleteProposalSection,
   PROPOSAL_SECTION_TYPES,
   type ProposalDocRecord,
 } from "./proposal.server";
@@ -90,9 +91,14 @@ export const getProposalCompletenessFn = createServerFn({ method: "GET" })
     z.object({ opportunityId: z.string().uuid(), workspaceId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
-    return calculateProposalCompleteness(
-      context.supabase,
-      data.workspaceId,
-      data.opportunityId,
-    );
+    return calculateProposalCompleteness(context.supabase, data.workspaceId, data.opportunityId);
+  });
+
+export const deleteProposalSectionFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) =>
+    z.object({ sectionId: z.string().uuid(), workspaceId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    return deleteProposalSection(context.supabase, data.workspaceId, data.sectionId);
   });

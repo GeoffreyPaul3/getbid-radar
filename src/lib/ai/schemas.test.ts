@@ -62,10 +62,19 @@ describe("requirement extraction schema", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("rejects an out-of-range confidence", () => {
+  it("normalises percentage-format confidence and rejects truly invalid values", () => {
+    // normaliseConfidence: values > 1 are treated as percentages (85 → 0.85)
+    // so 1.4 becomes 0.014 which is valid
+    const parsed14 = extractedRequirementSchema.safeParse({ ...validRequirement, confidence: 1.4 });
+    expect(parsed14.success).toBe(true);
+    if (parsed14.success) {
+      expect(parsed14.data.confidence).toBeCloseTo(0.014);
+    }
+    // 140 (%) → 1.40 which exceeds max(1) after normalisation
     expect(
-      extractedRequirementSchema.safeParse({ ...validRequirement, confidence: 1.4 }).success,
+      extractedRequirementSchema.safeParse({ ...validRequirement, confidence: 140 }).success,
     ).toBe(false);
+    // negative values are still rejected
     expect(
       extractedRequirementSchema.safeParse({ ...validRequirement, confidence: -1 }).success,
     ).toBe(false);

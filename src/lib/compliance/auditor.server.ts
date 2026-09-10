@@ -122,30 +122,34 @@ export async function runComplianceAudit(
   const bidWorkspaceId = bw.id;
 
   // 2. Fetch opportunity, requirements, proposal documents, knowledge evidence
-  const [{ data: opportunity }, { data: requirements }, { data: proposalDocs }, { data: evidenceDocs }] =
-    await Promise.all([
-      supabase
-        .from("opportunities")
-        .select("id, title, category, deadline, description")
-        .eq("id", opportunityId)
-        .eq("workspace_id", workspaceId)
-        .single(),
-      supabase
-        .from("opportunity_requirements")
-        .select("id, requirement, category, importance, is_mandatory, evidence_needed, company_match")
-        .eq("opportunity_id", opportunityId)
-        .eq("workspace_id", workspaceId),
-      supabase
-        .from("proposal_documents")
-        .select("id, title, content, section_type, completeness_status")
-        .eq("bid_workspace_id", bidWorkspaceId)
-        .eq("workspace_id", workspaceId),
-      supabase
-        .from("knowledge_documents")
-        .select("id, title, category, extracted_text")
-        .eq("workspace_id", workspaceId)
-        .limit(20),
-    ]);
+  const [
+    { data: opportunity },
+    { data: requirements },
+    { data: proposalDocs },
+    { data: evidenceDocs },
+  ] = await Promise.all([
+    supabase
+      .from("opportunities")
+      .select("id, title, category, deadline, description")
+      .eq("id", opportunityId)
+      .eq("workspace_id", workspaceId)
+      .single(),
+    supabase
+      .from("opportunity_requirements")
+      .select("id, requirement, category, importance, is_mandatory, evidence_needed, company_match")
+      .eq("opportunity_id", opportunityId)
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("proposal_documents")
+      .select("id, title, content, section_type, completeness_status")
+      .eq("bid_workspace_id", bidWorkspaceId)
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("knowledge_documents")
+      .select("id, title, category, extracted_text")
+      .eq("workspace_id", workspaceId)
+      .limit(20),
+  ]);
 
   if (!opportunity) {
     throw new Error(`Opportunity not found: ${opportunityId}`);
@@ -171,7 +175,9 @@ export async function runComplianceAudit(
     .join("\n");
 
   for (const req of mandatoryReqs) {
-    const isAddressed = proposalText.toLowerCase().includes(req.requirement.toLowerCase().slice(0, 25));
+    const isAddressed = proposalText
+      .toLowerCase()
+      .includes(req.requirement.toLowerCase().slice(0, 25));
     if (!isAddressed && proposalText.length < 50) {
       deterministicFindings.push({
         severity: req.importance === "critical" ? "critical" : "high",
@@ -196,7 +202,13 @@ DEADLINE: ${opportunity.deadline || "Not specified"}
 DESCRIPTION: ${opportunity.description || "Not available"}
 
 MANDATORY REQUIREMENTS (${mandatoryReqs.length} total):
-${mandatoryReqs.slice(0, 20).map((r) => `- [${r.importance?.toUpperCase() || "HIGH"}] ${r.requirement}${r.evidence_needed ? ` | Evidence needed: ${r.evidence_needed}` : ""}`).join("\n")}
+${mandatoryReqs
+  .slice(0, 20)
+  .map(
+    (r) =>
+      `- [${r.importance?.toUpperCase() || "HIGH"}] ${r.requirement}${r.evidence_needed ? ` | Evidence needed: ${r.evidence_needed}` : ""}`,
+  )
+  .join("\n")}
 
 PROPOSAL SECTIONS DRAFTED (${proposalDocs?.length ?? 0} sections):
 ${(proposalDocs ?? []).map((d) => `- [${d.section_type || "custom"}] ${d.title} (${d.completeness_status || "draft"})`).join("\n") || "NONE — No proposal sections exist yet"}
@@ -306,7 +318,9 @@ Identify all compliance gaps, missing documents, evaluation coverage gaps, and c
     await supabase.from("compliance_findings").insert(findingRows);
   }
 
-  const criticalCount = allFindings.filter((f) => f.severity === "critical" && f.status === "open").length;
+  const criticalCount = allFindings.filter(
+    (f) => f.severity === "critical" && f.status === "open",
+  ).length;
   const highCount = allFindings.filter((f) => f.severity === "high" && f.status === "open").length;
   const openCount = allFindings.filter((f) => f.status === "open").length;
   const passedCount = mandatoryReqs.length - criticalCount - highCount;

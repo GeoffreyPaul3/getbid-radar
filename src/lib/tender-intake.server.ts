@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { extractDocument, htmlToText } from "./extract.server";
 import { runOpportunityAnalysis } from "./analysis/pipeline.server";
+import { sendAnalysisCompleteEmail } from "./email/resend.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -366,6 +367,54 @@ export async function fetchSafeTenderUrl(
 /**
  * Ingests a tender from a safe URL, creates opportunity + document, and triggers Phase 2 analysis.
  */
+async function emitAnalysisNotifications(params: {
+  supabase: Client;
+  workspaceId: string;
+  userId: string;
+  opportunityId: string;
+  title: string;
+  score: number;
+  recommendation: string;
+}) {
+  const { supabase, workspaceId, userId, opportunityId, title, score, recommendation } = params;
+  const siteUrl =
+    process.env["APP_URL"] || process.env["APP_URL"] || "https://getbidradar.com";
+
+  // 1. In-app notification
+  try {
+    await supabase.from("notifications").insert({
+      workspace_id: workspaceId,
+      kind: "analysis_complete",
+      title: `Tender Analysis Complete: ${title}`,
+      body: `Deterministic Score: ${score}/100 (${recommendation})`,
+      link: `/tenders/${opportunityId}/workspace`,
+    });
+  } catch (err) {
+    console.warn("[Intake] In-app notification warning:", err);
+  }
+
+  // 2. Email notification
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profile?.email) {
+      await sendAnalysisCompleteEmail({
+        to: profile.email,
+        tenderTitle: title,
+        score,
+        recommendation,
+        url: `${siteUrl}/tenders/${opportunityId}/workspace`,
+      });
+    }
+  } catch (err) {
+    console.warn("[Intake] Analysis email notification warning:", err);
+  }
+}
+
 export async function ingestTenderFromUrl(args: {
   supabase: Client;
   userId: string;
@@ -446,6 +495,17 @@ export async function ingestTenderFromUrl(args: {
 
     if (analysisResult && analysisResult.ok) {
       await recordAnalysisUsage(supabase, workspaceId, opportunity.id, userId);
+      const score = (analysisResult as any).summary?.score ?? 0;
+      const recommendation = (analysisResult as any).summary?.recommendation ?? "REVIEW";
+      await emitAnalysisNotifications({
+        supabase,
+        workspaceId,
+        userId,
+        opportunityId: opportunity.id,
+        title: opportunity.title,
+        score,
+        recommendation,
+      });
     }
 
     return {
@@ -569,6 +629,17 @@ export async function ingestTenderFromUpload(args: {
 
     if (analysisResult && analysisResult.ok) {
       await recordAnalysisUsage(supabase, workspaceId, opportunity.id, userId);
+      const score = (analysisResult as any).summary?.score ?? 0;
+      const recommendation = (analysisResult as any).summary?.recommendation ?? "REVIEW";
+      await emitAnalysisNotifications({
+        supabase,
+        workspaceId,
+        userId,
+        opportunityId: opportunity.id,
+        title: opportunity.title,
+        score,
+        recommendation,
+      });
     }
 
     return {
