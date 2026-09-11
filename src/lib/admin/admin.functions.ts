@@ -2,8 +2,35 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requirePlatformAdminMiddleware } from "./admin.middleware";
 import { PLAN_CONFIGS, isPlanTier } from "../billing/plans";
+
+/**
+ * Server-side guard: verifies context.userId is a platform admin.
+ * Must only be called inside createServerFn handlers (server-only execution).
+ * Identity is derived from the cryptographic JWT session set by requireSupabaseAuth;
+ * NEVER from client-supplied data.
+ */
+async function assertPlatformAdmin(userId: string): Promise<void> {
+  if (!userId) {
+    throw new Error("UNAUTHORIZED_PLATFORM_ADMIN: No authenticated session found.");
+  }
+
+  const { data: profile, error } = await supabaseAdmin
+    .from("profiles")
+    .select("is_platform_admin")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !profile) {
+    console.error("[AdminGuard] Profile lookup failed:", error?.message);
+    throw new Error("UNAUTHORIZED_PLATFORM_ADMIN: Profile not found.");
+  }
+
+  if (!profile.is_platform_admin) {
+    console.warn(`[AdminGuard] Access denied for non-platform-admin user: ${userId}`);
+    throw new Error("UNAUTHORIZED_PLATFORM_ADMIN: Platform operator privileges required.");
+  }
+}
 
 // ==========================================
 // 1. Check Platform Admin Status
@@ -55,9 +82,10 @@ export interface AdminOverviewMetrics {
 }
 
 export const getAdminOverviewMetricsFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({}).optional().parse(data))
-  .handler(async (): Promise<AdminOverviewMetrics> => {
+  .handler(async ({ context }): Promise<AdminOverviewMetrics> => {
+    await assertPlatformAdmin(context.userId);
     const [
       { count: totalWorkspaces },
       { count: totalUsers },
@@ -131,9 +159,10 @@ export interface AdminCompanyRecord {
 }
 
 export const getAdminCompaniesFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({}).optional().parse(data))
-  .handler(async (): Promise<AdminCompanyRecord[]> => {
+  .handler(async ({ context }): Promise<AdminCompanyRecord[]> => {
+    await assertPlatformAdmin(context.userId);
     const { data: workspaces, error } = await supabaseAdmin
       .from("workspaces")
       .select(`
@@ -163,7 +192,7 @@ export const getAdminCompaniesFn = createServerFn({ method: "POST" })
   });
 
 export const updateCompanyPlanOverrideFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) =>
     z
       .object({
@@ -173,7 +202,8 @@ export const updateCompanyPlanOverrideFn = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertPlatformAdmin(context.userId);
     const { error } = await supabaseAdmin
       .from("workspaces")
       .update({
@@ -203,9 +233,10 @@ export interface AdminUserRecord {
 }
 
 export const getAdminUsersFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({}).optional().parse(data))
-  .handler(async (): Promise<AdminUserRecord[]> => {
+  .handler(async ({ context }): Promise<AdminUserRecord[]> => {
+    await assertPlatformAdmin(context.userId);
     const { data: users, error } = await supabaseAdmin
       .from("profiles")
       .select("id, email, full_name, avatar_url, is_platform_admin, created_at")
@@ -219,7 +250,7 @@ export const getAdminUsersFn = createServerFn({ method: "POST" })
   });
 
 export const toggleUserAdminStatusFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) =>
     z
       .object({
@@ -229,6 +260,7 @@ export const toggleUserAdminStatusFn = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data, context }) => {
+    await assertPlatformAdmin(context.userId);
     // Prevent revoking oneself to avoid locking out the last admin
     if (context.userId === data.targetUserId && !data.makeAdmin) {
       throw new Error("You cannot revoke your own platform administrator privileges.");
@@ -266,9 +298,10 @@ export interface AdminTransactionRecord {
 }
 
 export const getAdminRevenueFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({}).optional().parse(data))
-  .handler(async (): Promise<AdminTransactionRecord[]> => {
+  .handler(async ({ context }): Promise<AdminTransactionRecord[]> => {
+    await assertPlatformAdmin(context.userId);
     const { data: txs, error } = await supabaseAdmin
       .from("billing_transactions")
       .select(`
@@ -314,9 +347,10 @@ export interface AdminAnalyticsData {
 }
 
 export const getAdminAnalyticsFn = createServerFn({ method: "POST" })
-  .middleware([requirePlatformAdminMiddleware])
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({}).optional().parse(data))
-  .handler(async (): Promise<AdminAnalyticsData> => {
+  .handler(async ({ context }): Promise<AdminAnalyticsData> => {
+    await assertPlatformAdmin(context.userId);
     const [
       { data: opps },
       { data: audits },

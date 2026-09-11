@@ -62,7 +62,7 @@ function AdminRevenuePage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminRevenueFn({ data: { adminUserId: user.id } });
+      const data = await getAdminRevenueFn({ data: {} });
       setTransactions(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load revenue data.");

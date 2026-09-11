@@ -30,6 +30,25 @@ export const initiateCheckoutFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => initiateCheckoutSchema.parse(data))
   .handler(async ({ data, context }) => {
+    // Authorization: only workspace owners and admins may initiate billing checkout.
+    // Uses the session-scoped supabase client (RLS applies) to verify role.
+    const { data: membership, error: roleError } = await context.supabase
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", data.workspaceId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (roleError || !membership) {
+      throw new Error("BILLING_UNAUTHORIZED: You are not a member of this workspace.");
+    }
+
+    if (membership.role !== "owner" && membership.role !== "admin") {
+      throw new Error(
+        "BILLING_UNAUTHORIZED: Only workspace owners and administrators may initiate billing checkout."
+      );
+    }
+
     // Get user details for PayChangu receipt
     const { data: profile } = await context.supabase
       .from("profiles")

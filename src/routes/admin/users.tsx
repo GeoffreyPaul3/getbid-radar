@@ -51,7 +51,7 @@ function AdminUsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminUsersFn({ data: { adminUserId: user.id } });
+      const data = await getAdminUsersFn({ data: {} });
       setUsers(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load users.";
@@ -71,7 +71,6 @@ function AdminUsersPage() {
     try {
       await toggleUserAdminStatusFn({
         data: {
-          adminUserId: user.id,
           targetUserId: targetUser.id,
           makeAdmin,
         },

@@ -46,7 +46,7 @@ function AdminAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminAnalyticsFn({ data: { adminUserId: user.id } });
+      const data = await getAdminAnalyticsFn({ data: {} });
       setAnalytics(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load analytics.");

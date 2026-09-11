@@ -59,7 +59,7 @@ function AdminCompaniesPage() {
     if (!user?.id) return;
     setLoading(true);
     setError(null);
-    getAdminCompaniesFn({ data: { adminUserId: user.id } })
+    getAdminCompaniesFn({ data: {} })
       .then((data) => setCompanies(data))
       .catch((err) => setError(err.message || "Failed to load companies."))
       .finally(() => setLoading(false));
@@ -76,7 +76,6 @@ function AdminCompaniesPage() {
     try {
       await updateCompanyPlanOverrideFn({
         data: {
-          adminUserId: user.id,
           workspaceId: editWorkspace.id,
           plan: selectedPlan,
           subscriptionStatus: selectedStatus,
