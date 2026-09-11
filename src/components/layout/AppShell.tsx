@@ -39,6 +39,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import logo from "@/assets/bidradar.png";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
+import { PasswordNudgeDialog } from "@/components/auth/PasswordNudgeDialog";
 import {
   getUnreadNotificationsFn,
   markAllReadFn,
@@ -711,6 +712,7 @@ export function AppShell({ children }: AppShellProps) {
           <main className="flex-1 min-w-0">{children}</main>
         </div>
       </div>
+      <PasswordNudgeDialog />
     </TooltipProvider>
   );
 }

@@ -275,7 +275,8 @@ function AdminCompaniesPage() {
                   <SelectItem value="trial">Trial (14-Day Evaluation)</SelectItem>
                   <SelectItem value="starter">Starter Plan</SelectItem>
                   <SelectItem value="growth">Growth Plan</SelectItem>
-                  <SelectItem value="pro">Pro Enterprise</SelectItem>
+                  <SelectItem value="pro">Pro Plan</SelectItem>
+                  <SelectItem value="enterprise">Enterprise Custom</SelectItem>
                 </SelectContent>
               </Select>
             </div>

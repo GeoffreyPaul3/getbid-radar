@@ -54,6 +54,11 @@ import {
   User,
   Camera,
   Upload,
+  Lock,
+  KeyRound,
+  Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -240,6 +245,55 @@ function SettingsPage() {
     loadMembers();
   }, [loadMembers]);
 
+  // Credentials dialog for newly invited team member
+  const [invitedCredentials, setInvitedCredentials] = useState<{
+    email: string;
+    tempPassword: string;
+    role: string;
+  } | null>(null);
+
+  // Security / Password Change State
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { must_change_password: false },
+      });
+      if (error) throw error;
+
+      if (user?.id) {
+        await supabase
+          .from("profiles")
+          .update({ must_change_password: false, updated_at: new Date().toISOString() })
+          .eq("id", user.id);
+      }
+
+      toast.success("Password changed successfully!");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      toast.error("Failed to change password", { description: (err as Error).message });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspace || !newMemberEmail.trim()) return;
@@ -254,6 +308,13 @@ function SettingsPage() {
         },
       });
       toast.success(res.message);
+      if (res.temporaryPassword) {
+        setInvitedCredentials({
+          email: newMemberEmail.trim(),
+          tempPassword: res.temporaryPassword,
+          role: newMemberRole,
+        });
+      }
       setAddMemberOpen(false);
       setNewMemberEmail("");
       setNewMemberName("");
@@ -400,9 +461,12 @@ function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full sm:w-[580px] grid-cols-4 bg-secondary/80">
+          <TabsList className="grid w-full sm:w-[720px] grid-cols-5 bg-secondary/80">
             <TabsTrigger value="profile" className="text-xs font-medium flex items-center gap-2">
               <User className="h-3.5 w-3.5" /> My Profile
+            </TabsTrigger>
+            <TabsTrigger value="security" className="text-xs font-medium flex items-center gap-2">
+              <KeyRound className="h-3.5 w-3.5" /> Security
             </TabsTrigger>
             <TabsTrigger value="company" className="text-xs font-medium flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" /> Company Profile
@@ -561,6 +625,142 @@ function SettingsPage() {
                     </Button>
                   </div>
                 </form>
+
+                {/* Password & Security Quick Access */}
+                <div className="pt-6 mt-6 border-t border-border/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-semibold text-foreground">Password & Account Security</h4>
+                    <p className="text-[11px] text-muted-foreground">Manage your credentials, change password, and view session controls.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab("security")}
+                    className="text-xs flex items-center gap-1.5 shrink-0"
+                  >
+                    <KeyRound className="h-3.5 w-3.5 text-primary" />
+                    Change Password
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: Security & Authentication */}
+          <TabsContent value="security" className="mt-4 space-y-6">
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-primary" />
+                  <CardTitle className="font-display text-lg">
+                    Change Password
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  Update your account password. Choose a strong password with at least 8 characters.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        required
+                        minLength={8}
+                        className="text-xs h-10 pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords(!showPasswords)}
+                        className="absolute right-2.5 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Confirm New Password</Label>
+                    <Input
+                      type={showPasswords ? "text" : "password"}
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Re-enter your new password"
+                      required
+                      minLength={8}
+                      className="text-xs h-10"
+                    />
+                  </div>
+
+                  <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground space-y-1 border border-border/50">
+                    <p className="font-semibold text-foreground">Password Guidelines:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                      <li>Minimum 8 characters in length</li>
+                      <li>Include uppercase, lowercase, and numeric characters</li>
+                      <li>Single-use sessions protected by encrypted credentials</li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      disabled={isChangingPassword || !newPassword}
+                      className="font-medium text-xs px-5"
+                    >
+                      {isChangingPassword ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Updating Password...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3.5 w-3.5 mr-2" /> Update Password
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-border/80 shadow-panel bg-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  <CardTitle className="font-display text-lg">
+                    Security & Session Details
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  Review active credentials and workspace access controls.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-1">
+                    <span className="text-muted-foreground">Account Email:</span>
+                    <p className="font-medium text-foreground font-mono">{user?.email || "Unknown"}</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-1">
+                    <span className="text-muted-foreground">Workspace Role:</span>
+                    <p className="font-medium text-foreground uppercase font-mono">{role || "Member"}</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-1">
+                    <span className="text-muted-foreground">Authentication Method:</span>
+                    <p className="font-medium text-foreground">Email & Password (Encrypted)</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-1">
+                    <span className="text-muted-foreground">Session Status:</span>
+                    <p className="font-medium text-bid flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-bid animate-pulse" /> Active & Secure
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1228,6 +1428,70 @@ function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Team Member Temporary Credentials Modal */}
+      <Dialog
+        open={Boolean(invitedCredentials)}
+        onOpenChange={(open) => !open && setInvitedCredentials(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-2">
+              <KeyRound className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-center text-base font-bold">
+              Team Member Invited Successfully!
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs">
+              An invitation email has been dispatched to <strong>{invitedCredentials?.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-700 dark:text-amber-400">
+              A temporary password was generated for this account. You can copy it below to provide it directly to the team member:
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Temporary Password</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  readOnly
+                  value={invitedCredentials?.tempPassword || ""}
+                  className="font-mono text-xs bg-muted/50 select-all"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (invitedCredentials?.tempPassword) {
+                      navigator.clipboard.writeText(invitedCredentials.tempPassword);
+                      toast.success("Temporary password copied to clipboard");
+                    }
+                  }}
+                  className="shrink-0 text-xs"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              When they sign in via their invitation link, they will be prompted to replace this with a permanent password (or they may choose to skip).
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setInvitedCredentials(null)}
+              className="w-full text-xs"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

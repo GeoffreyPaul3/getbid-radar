@@ -15,6 +15,7 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -25,7 +26,10 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminCompaniesRouteImport } from './routes/admin/companies'
+import { Route as AdminRevenueRouteImport } from './routes/admin/revenue'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as BillingIndexRouteImport } from './routes/billing.index'
 import { Route as BillingConfirmRouteImport } from './routes/billing.confirm'
 import { Route as TendersIndexRouteImport } from './routes/tenders/index'
@@ -62,6 +66,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeRoute = KnowledgeRouteImport.update({
@@ -114,9 +123,24 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/admin/analytics',
+  path: '/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCompaniesRoute = AdminCompaniesRouteImport.update({
   id: '/admin/companies',
   path: '/admin/companies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRevenueRoute = AdminRevenueRouteImport.update({
+  id: '/admin/revenue',
+  path: '/admin/revenue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BillingIndexRoute = BillingIndexRouteImport.update({
@@ -162,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -171,7 +196,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/revenue': typeof AdminRevenueRoute
+  '/admin/users': typeof AdminUsersRoute
   '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
   '/admin/': typeof AdminIndexRoute
@@ -188,6 +216,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -197,7 +226,10 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/revenue': typeof AdminRevenueRoute
+  '/admin/users': typeof AdminUsersRoute
   '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
   '/admin': typeof AdminIndexRoute
@@ -215,6 +247,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -224,7 +257,10 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/revenue': typeof AdminRevenueRoute
+  '/admin/users': typeof AdminUsersRoute
   '/billing/confirm': typeof BillingConfirmRoute
   '/tenders/new': typeof TendersNewRoute
   '/admin/': typeof AdminIndexRoute
@@ -243,6 +279,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/join'
     | '/knowledge'
     | '/login'
     | '/onboarding'
@@ -252,7 +289,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/terms'
+    | '/admin/analytics'
     | '/admin/companies'
+    | '/admin/revenue'
+    | '/admin/users'
     | '/billing/confirm'
     | '/tenders/new'
     | '/admin/'
@@ -269,6 +309,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/join'
     | '/knowledge'
     | '/login'
     | '/onboarding'
@@ -278,7 +319,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/terms'
+    | '/admin/analytics'
     | '/admin/companies'
+    | '/admin/revenue'
+    | '/admin/users'
     | '/billing/confirm'
     | '/tenders/new'
     | '/admin'
@@ -295,6 +339,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/join'
     | '/knowledge'
     | '/login'
     | '/onboarding'
@@ -304,7 +349,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/terms'
+    | '/admin/analytics'
     | '/admin/companies'
+    | '/admin/revenue'
+    | '/admin/users'
     | '/billing/confirm'
     | '/tenders/new'
     | '/admin/'
@@ -322,6 +370,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  JoinRoute: typeof JoinRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -331,7 +380,10 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCompaniesRoute: typeof AdminCompaniesRoute
+  AdminRevenueRoute: typeof AdminRevenueRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   BillingConfirmRoute: typeof BillingConfirmRoute
   TendersNewRoute: typeof TendersNewRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -384,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/knowledge': {
@@ -456,11 +515,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/admin/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/companies': {
       id: '/admin/companies'
       path: '/admin/companies'
       fullPath: '/admin/companies'
       preLoaderRoute: typeof AdminCompaniesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/revenue': {
+      id: '/admin/revenue'
+      path: '/admin/revenue'
+      fullPath: '/admin/revenue'
+      preLoaderRoute: typeof AdminRevenueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/billing/': {
@@ -522,6 +602,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  JoinRoute: JoinRoute,
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
@@ -531,7 +612,10 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCompaniesRoute: AdminCompaniesRoute,
+  AdminRevenueRoute: AdminRevenueRoute,
+  AdminUsersRoute: AdminUsersRoute,
   BillingConfirmRoute: BillingConfirmRoute,
   TendersNewRoute: TendersNewRoute,
   AdminIndexRoute: AdminIndexRoute,

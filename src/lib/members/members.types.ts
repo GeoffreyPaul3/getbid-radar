@@ -10,3 +10,25 @@ export interface WorkspaceMemberRecord {
   avatarUrl: string | null;
   isPending: boolean;
 }
+
+export interface InviteMemberResult {
+  ok: boolean;
+  message: string;
+  invitationId?: string;
+  temporaryPassword?: string;
+}
+
+export interface InvitationDetails {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  email: string;
+  fullName: string;
+  role: AppRole;
+  status: string;
+  expiresAt: string;
+  invitedByName: string;
+  isExpired: boolean;
+  isAccepted: boolean;
+}
+

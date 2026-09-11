@@ -174,7 +174,7 @@ export const updateCompanyPlanOverrideFn = createServerFn({ method: "POST" })
       .object({
         adminUserId: z.string().min(1),
         workspaceId: z.string().min(1),
-        plan: z.enum(["trial", "starter", "growth", "pro"]),
+        plan: z.enum(["trial", "starter", "growth", "pro", "enterprise"]),
         subscriptionStatus: z.string().optional(),
       })
       .parse(data)

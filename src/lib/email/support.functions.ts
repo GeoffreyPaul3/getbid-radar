@@ -98,7 +98,7 @@ export const sendSupportTicketFn = createServerFn({ method: "POST" })
             success: false,
             error:
               result.reason === "API_KEY_NOT_CONFIGURED"
-                ? "Support dispatch is temporarily offline. Please email support@getbidradar.com directly."
+                ? "Support dispatch is temporarily offline. Please email designing90@gmail.com directly."
                 : "Failed to dispatch support ticket. Please try again.",
           };
         }
@@ -109,7 +109,7 @@ export const sendSupportTicketFn = createServerFn({ method: "POST" })
         console.error("[Support] Unexpected error delivering ticket:", msg);
         return {
           success: false,
-          error: "An unexpected error occurred. Please reach out to support@getbidradar.com.",
+          error: "An unexpected error occurred. Please reach out to designing90@gmail.com.",
         };
       }
     }

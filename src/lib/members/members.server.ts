@@ -5,7 +5,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { sendMemberInvitationEmail } from "../email/resend.server";
+import { sendMemberInvitationEmail, getAppUrl } from "../email/resend.server";
 
 export type Client = SupabaseClient<Database>;
 export type AppRole = "owner" | "admin" | "member" | "viewer";
@@ -130,15 +130,32 @@ export async function listWorkspaceMembers(
 }
 
 /**
+ * Generate a cryptographically secure, random 12-character temporary password.
+ * Format contains uppercase, lowercase, numbers, and symbols.
+ */
+export function generateTemporaryPassword(): string {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const symbols = "!@#$%&*";
+  let pwd = "";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  for (let i = 0; i < 10; i++) {
+    pwd += chars.charAt(bytes[i]! % chars.length);
+  }
+  const symBytes = crypto.getRandomValues(new Uint8Array(2));
+  pwd += symbols.charAt(symBytes[0]! % symbols.length) + symbols.charAt(symBytes[1]! % symbols.length);
+  return pwd;
+}
+
+/**
  * Send an invitation to a new team member.
  * Only owners and admins can invite members.
  * Supports: owner, admin, member, viewer.
- * NEVER creates fake profiles or accepts passwords.
+ * Generates a cryptographically secure single-use token and temporary password.
  */
 export async function inviteWorkspaceMember(
   supabase: Client,
   params: InviteMemberParams,
-): Promise<{ ok: boolean; message: string; invitationId?: string }> {
+): Promise<{ ok: boolean; message: string; invitationId?: string; temporaryPassword?: string }> {
   const { workspaceId, callerUserId, email, fullName, role } = params;
 
   // 1. Authorization check: caller must be owner or admin
@@ -191,7 +208,24 @@ export async function inviteWorkspaceMember(
     }
   }
 
-  // 3. Check if an account already exists with this email
+  // Resolve inviter name from profile for clear email branding
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", callerUserId)
+    .maybeSingle();
+  const inviterName = callerProfile?.full_name?.trim() || "A workspace administrator";
+
+  // Fetch workspace name for notification
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("name")
+    .eq("id", workspaceId)
+    .single();
+  const wsName = ws?.name || "GetBidRadar Workspace";
+  const appUrl = getAppUrl();
+
+  // 3. Check if an account already exists with this email in profiles
   const { data: existingProfile } = await supabase
     .from("profiles")
     .select("id, email, full_name")
@@ -222,27 +256,57 @@ export async function inviteWorkspaceMember(
 
     if (insertErr) throw insertErr;
 
-    // Fetch workspace name for notification
-    const { data: ws } = await supabase
-      .from("workspaces")
-      .select("name")
-      .eq("id", workspaceId)
-      .single();
-    const wsName = ws?.name || "GetBidRadar Workspace";
-
-    // Send notification email (non-blocking)
+    // Send notification email with direct workspace destination
     await sendMemberInvitationEmail({
       toEmail: normalizedEmail,
       fullName: cleanName,
-      invitedByName: "A workspace administrator",
+      invitedByName: inviterName,
       workspaceName: wsName,
       role,
+      setupUrl: `${appUrl}/tenders`,
     });
 
     return { ok: true, message: `Added ${cleanName} to workspace as ${role}.` };
   }
 
-  // 4. User does not have an account yet: create or refresh workspace_invitations record
+  // 4. User does not have an account yet: generate token & temporary password
+  const token = crypto.randomUUID();
+  const tempPassword = generateTemporaryPassword();
+
+  // Provision user in Supabase Auth via admin client so they can sign in immediately with temporary password
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: cleanName,
+        must_change_password: true,
+      },
+    });
+
+    if (authErr) {
+      console.warn("[Members] Admin createUser notice:", authErr.message);
+      // If user was previously registered in auth.users, update their password and metadata
+      const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+      const match = userList?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail);
+      if (match) {
+        await supabaseAdmin.auth.admin.updateUserById(match.id, {
+          password: tempPassword,
+          user_metadata: {
+            ...match.user_metadata,
+            full_name: cleanName,
+            must_change_password: true,
+          },
+        });
+      }
+    }
+  } catch (authCreateErr) {
+    console.warn("[Members] Auth provision error:", authCreateErr);
+  }
+
+  // Create or refresh workspace_invitations record with single-use token and 7-day expiry
   const { data: invitation, error: invErr } = await supabase
     .from("workspace_invitations")
     .upsert(
@@ -253,6 +317,8 @@ export async function inviteWorkspaceMember(
         role: role as Database["public"]["Enums"]["app_role"],
         invited_by: callerUserId,
         status: "pending",
+        token,
+        temporary_password: tempPassword,
         created_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       },
@@ -266,27 +332,24 @@ export async function inviteWorkspaceMember(
     throw new Error("Failed to record workspace invitation.");
   }
 
-  // Fetch workspace name for email
-  const { data: ws } = await supabase
-    .from("workspaces")
-    .select("name")
-    .eq("id", workspaceId)
-    .single();
-  const wsName = ws?.name || "GetBidRadar Workspace";
+  const setupUrl = `${appUrl}/join?token=${token}`;
 
-  // Send branded invitation email (non-blocking, never contains password)
+  // Send branded invitation email with setup link and temporary password
   await sendMemberInvitationEmail({
     toEmail: normalizedEmail,
     fullName: cleanName,
-    invitedByName: "A workspace administrator",
+    invitedByName: inviterName,
     workspaceName: wsName,
     role,
+    setupUrl,
+    temporaryPassword: tempPassword,
   });
 
   return {
     ok: true,
-    message: `Invitation sent to ${normalizedEmail}.`,
+    message: `Invitation sent to ${normalizedEmail} with temporary credentials.`,
     invitationId: invitation.id,
+    temporaryPassword: tempPassword,
   };
 }
 

@@ -1467,6 +1467,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_platform_admin: boolean
+          must_change_password: boolean | null
           updated_at: string
         }
         Insert: {
@@ -1476,6 +1477,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_platform_admin?: boolean
+          must_change_password?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -1485,6 +1487,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_platform_admin?: boolean
+          must_change_password?: boolean | null
           updated_at?: string
         }
         Relationships: []
@@ -1815,6 +1818,8 @@ export type Database = {
           invited_by: string
           role: Database["public"]["Enums"]["app_role"]
           status: string
+          temporary_password: string | null
+          token: string | null
           workspace_id: string
         }
         Insert: {
@@ -1826,6 +1831,8 @@ export type Database = {
           invited_by: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          temporary_password?: string | null
+          token?: string | null
           workspace_id: string
         }
         Update: {
@@ -1837,6 +1844,8 @@ export type Database = {
           invited_by?: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          temporary_password?: string | null
+          token?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1940,6 +1949,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation_by_token: {
+        Args: {
+          _token: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       can_admin: { Args: { _ws: string }; Returns: boolean }
       can_write: { Args: { _ws: string }; Returns: boolean }
       get_workspace_member_directory: {
@@ -1956,6 +1972,22 @@ export type Database = {
         }[]
       }
       is_member: { Args: { _ws: string }; Returns: boolean }
+      lookup_invitation_by_token: {
+        Args: {
+          _token: string
+        }
+        Returns: {
+          email: string
+          expires_at: string
+          full_name: string
+          id: string
+          invited_by_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
       member_role: {
         Args: { _ws: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1991,7 +2023,7 @@ export type Database = {
         | "lost"
         | "archived"
       outcome_result: "won" | "lost" | "cancelled" | "disqualified"
-      plan_tier: "trial" | "starter" | "growth" | "pro"
+      plan_tier: "trial" | "starter" | "growth" | "pro" | "enterprise"
       recommendation: "bid" | "review" | "no_bid"
       requirement_status:
         | "pass"
@@ -2180,7 +2212,7 @@ export const Constants = {
         "archived",
       ],
       outcome_result: ["won", "lost", "cancelled", "disqualified"],
-      plan_tier: ["trial", "starter", "growth", "pro"],
+      plan_tier: ["trial", "starter", "growth", "pro", "enterprise"],
       recommendation: ["bid", "review", "no_bid"],
       requirement_status: [
         "pass",

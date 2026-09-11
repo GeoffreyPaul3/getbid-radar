@@ -17,11 +17,24 @@ import {
 } from "./members.server";
 
 // ────────────────────────────────────────────────────────────────
-// Mock email sender — must not be called with passwords
+// Mock email sender & server-side dependencies
 // ────────────────────────────────────────────────────────────────
 
 vi.mock("../email/resend.server", () => ({
   sendMemberInvitationEmail: vi.fn().mockResolvedValue({ ok: true }),
+  getAppUrl: vi.fn().mockReturnValue("https://getbidradar.com"),
+}));
+
+vi.mock("@/integrations/supabase/client.server", () => ({
+  supabaseAdmin: {
+    auth: {
+      admin: {
+        createUser: vi.fn().mockResolvedValue({ data: { user: { id: "test-user-id" } }, error: null }),
+        listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }),
+        updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      },
+    },
+  },
 }));
 
 // ────────────────────────────────────────────────────────────────
@@ -377,13 +390,13 @@ describe("inviteWorkspaceMember", () => {
     ).rejects.toThrow("Seat limit reached");
   });
 
-  it("never generates or includes passwords in invitation", async () => {
+  it("generates secure temporary password and invitation link for new members", async () => {
     const { sendMemberInvitationEmail } = await import("../email/resend.server");
     const mockFn = sendMemberInvitationEmail as ReturnType<typeof vi.fn>;
     mockFn.mockClear();
 
     const db = buildDb();
-    await inviteWorkspaceMember(db.client(), {
+    const result = await inviteWorkspaceMember(db.client(), {
       workspaceId: WS_ID,
       callerUserId: CALLER_ID,
       email: "newmember@example.com",
@@ -393,10 +406,11 @@ describe("inviteWorkspaceMember", () => {
 
     expect(mockFn).toHaveBeenCalledOnce();
     const call = mockFn.mock.calls[0]![0];
-    // Must NOT contain any password field
-    expect(call).not.toHaveProperty("password");
-    expect(call).not.toHaveProperty("temporaryPassword");
-    expect(call).not.toHaveProperty("plaintext");
+    expect(call).toHaveProperty("temporaryPassword");
+    expect(call.temporaryPassword).toBeDefined();
+    expect(typeof call.temporaryPassword).toBe("string");
+    expect(call.setupUrl).toContain("/join?token=");
+    expect(result.temporaryPassword).toBe(call.temporaryPassword);
   });
 });
 

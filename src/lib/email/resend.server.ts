@@ -9,7 +9,7 @@ import { ensureServerEnv } from "../server-env";
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 /** Canonical site origin, resolved once per process from APP_URL env var. */
-function getAppUrl(): string {
+export function getAppUrl(): string {
   return process.env["APP_URL"] || "https://getbidradar.com";
 }
 
@@ -245,12 +245,18 @@ export async function sendMemberInvitationEmail(params: {
   workspaceName: string;
   role: string;
   setupUrl?: string | undefined;
+  temporaryPassword?: string | undefined;
 }): Promise<SendEmailResult> {
   const appUrl = getAppUrl();
   const setupUrl = params.setupUrl || `${appUrl}/login`;
 
   const subject = `You've been invited to join ${params.workspaceName} on GetBidRadar`;
-  const text = `Hello ${params.fullName},\n\n${params.invitedByName} has invited you to join ${params.workspaceName} on GetBidRadar as a ${params.role.toUpperCase()}.\n\nAccept your invitation and sign in: ${setupUrl}\n\nGetBidRadar helps organizations evaluate procurement opportunities, verify evidence, coordinate bid execution, and submit winning proposals with certainty.\n\nThe GetBidRadar Team`;
+  let credentialsNotice = "";
+  if (params.temporaryPassword) {
+    credentialsNotice = `\n\nTEMPORARY LOGIN CREDENTIALS:\nEmail: ${params.toEmail}\nTemporary Password: ${params.temporaryPassword}\nUse this temporary password to log in. You will be prompted to change your password upon your first sign in (or you may skip).`;
+  }
+
+  const text = `Hello ${params.fullName},\n\n${params.invitedByName} has invited you to join ${params.workspaceName} on GetBidRadar as a ${params.role.toUpperCase()}.${credentialsNotice}\n\nAccept your invitation and sign in: ${setupUrl}\n\nThis invitation expires in 7 days.\n\nGetBidRadar helps organizations evaluate procurement opportunities, verify evidence, coordinate bid execution, and submit winning proposals with certainty.\n\nThe GetBidRadar Team`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #101828;">
@@ -259,22 +265,30 @@ export async function sendMemberInvitationEmail(params: {
         <p style="margin: 4px 0 0; color: #667085; font-size: 13px;">Enterprise Workspace Invitation</p>
       </div>
       <div style="padding: 24px 0;">
-        <p style="font-size: 15px; margin-top: 0;">Hello <strong>${params.fullName}</strong>,</p>
+        <p style="font-size: 15px; margin-top: 0;">Hello <strong>${escapeHtml(params.fullName)}</strong>,</p>
         <p style="font-size: 14px; color: #344054; line-height: 1.6;">
-          <strong>${params.invitedByName}</strong> has invited you to join the <strong>${params.workspaceName}</strong> workspace on GetBidRadar with the role of <strong>${params.role.toUpperCase()}</strong>.
+          <strong>${escapeHtml(params.invitedByName)}</strong> has invited you to join the <strong>${escapeHtml(params.workspaceName)}</strong> workspace on GetBidRadar with the role of <strong>${params.role.toUpperCase()}</strong>.
         </p>
         <div style="background-color: #F8F9FC; border: 1px solid #E4E7EC; border-radius: 8px; padding: 16px; margin: 20px 0;">
           <p style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #667085; font-weight: 600;">Invitation Details</p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Workspace:</strong> ${params.workspaceName}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Workspace:</strong> ${escapeHtml(params.workspaceName)}</p>
           <p style="margin: 4px 0; font-size: 14px;"><strong>Assigned Role:</strong> <span style="text-transform: uppercase; font-family: monospace; color: #2563EB; font-weight: 700;">${params.role}</span></p>
         </div>
+        ${params.temporaryPassword ? `
+        <div style="background-color: #FEF9EE; border: 1px solid #F5D99B; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #B45309; font-weight: 700;">Temporary Login Credentials</p>
+          <p style="margin: 4px 0; font-size: 13px; color: #475467;">Email: <strong>${escapeHtml(params.toEmail)}</strong></p>
+          <p style="margin: 4px 0; font-size: 13px; color: #475467;">Temporary Password: <code style="background: #FFFFFF; border: 1px solid #E4E7EC; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; font-weight: 700; color: #0B1220;">${escapeHtml(params.temporaryPassword)}</code></p>
+          <p style="margin: 8px 0 0 0; font-size: 12px; color: #78350F;">Upon logging in, you will be prompted to create your own permanent password (or you may skip for now).</p>
+        </div>
+        ` : ""}
         <div style="margin: 28px 0;">
           <a href="${setupUrl}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
             Accept Invitation & Access Workspace →
           </a>
         </div>
-        <p style="color: #667085; font-size: 13px; line-height: 1.5;">
-          For security, sign in with your email address (<strong>${params.toEmail}</strong>) or complete your secure account setup.
+        <p style="color: #667085; font-size: 12px; line-height: 1.5; margin-top: 16px;">
+          This secure single-use invitation link expires in 7 days. If you did not expect this invitation, you can safely ignore this email.
         </p>
       </div>
       <div style="padding-top: 20px; border-top: 1px solid #E4E7EC; font-size: 12px; color: #98A2B3;">
