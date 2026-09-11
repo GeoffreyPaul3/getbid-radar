@@ -1818,7 +1818,6 @@ export type Database = {
           invited_by: string
           role: Database["public"]["Enums"]["app_role"]
           status: string
-          temporary_password: string | null
           token: string | null
           workspace_id: string
         }
@@ -1831,7 +1830,6 @@ export type Database = {
           invited_by: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
-          temporary_password?: string | null
           token?: string | null
           workspace_id: string
         }
@@ -1844,7 +1842,6 @@ export type Database = {
           invited_by?: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
-          temporary_password?: string | null
           token?: string | null
           workspace_id?: string
         }

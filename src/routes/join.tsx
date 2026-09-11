@@ -68,6 +68,16 @@ function JoinWorkspacePage() {
     setError(null);
     try {
       const data = await lookupInvitationByTokenFn({ data: { token } });
+      if (data.isExpired) {
+        setError("This invitation link has expired. Please request a new invitation from your workspace administrator.");
+        setInvitation(null);
+        return;
+      }
+      if (data.isAccepted) {
+        setError("This invitation link has already been used and accepted. Please sign in to your workspace.");
+        setInvitation(null);
+        return;
+      }
       setInvitation(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to verify invitation link.";

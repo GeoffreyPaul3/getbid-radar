@@ -47,7 +47,7 @@ export function AdminShell({ children, title, description }: AdminShellProps) {
     }
 
     let isMounted = true;
-    checkPlatformAdminStatusFn({ data: { userId: user.id } })
+    checkPlatformAdminStatusFn()
       .then((res) => {
         if (isMounted) {
           setIsAdmin(res.isPlatformAdmin);

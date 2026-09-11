@@ -1,22 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { requirePlatformAdmin } from "./admin.middleware";
-import { PLAN_CONFIGS, type PlanTier, isPlanTier } from "../billing/plans";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requirePlatformAdminMiddleware } from "./admin.middleware";
+import { PLAN_CONFIGS, isPlanTier } from "../billing/plans";
 
 // ==========================================
 // 1. Check Platform Admin Status
 // ==========================================
 export const checkPlatformAdminStatusFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ userId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<{ isPlatformAdmin: boolean }> => {
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async ({ context }): Promise<{ isPlatformAdmin: boolean }> => {
     try {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("is_platform_admin")
-        .eq("id", data.userId)
+        .eq("id", context.userId)
         .maybeSingle();
 
       return { isPlatformAdmin: Boolean(profile?.is_platform_admin) };
@@ -55,12 +55,9 @@ export interface AdminOverviewMetrics {
 }
 
 export const getAdminOverviewMetricsFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ adminUserId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<AdminOverviewMetrics> => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .middleware([requirePlatformAdminMiddleware])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async (): Promise<AdminOverviewMetrics> => {
     const [
       { count: totalWorkspaces },
       { count: totalUsers },
@@ -134,12 +131,9 @@ export interface AdminCompanyRecord {
 }
 
 export const getAdminCompaniesFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ adminUserId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<AdminCompanyRecord[]> => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .middleware([requirePlatformAdminMiddleware])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async (): Promise<AdminCompanyRecord[]> => {
     const { data: workspaces, error } = await supabaseAdmin
       .from("workspaces")
       .select(`
@@ -169,10 +163,10 @@ export const getAdminCompaniesFn = createServerFn({ method: "POST" })
   });
 
 export const updateCompanyPlanOverrideFn = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdminMiddleware])
   .validator((data: unknown) =>
     z
       .object({
-        adminUserId: z.string().min(1),
         workspaceId: z.string().min(1),
         plan: z.enum(["trial", "starter", "growth", "pro", "enterprise"]),
         subscriptionStatus: z.string().optional(),
@@ -180,8 +174,6 @@ export const updateCompanyPlanOverrideFn = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    await requirePlatformAdmin(data.adminUserId);
-
     const { error } = await supabaseAdmin
       .from("workspaces")
       .update({
@@ -211,12 +203,9 @@ export interface AdminUserRecord {
 }
 
 export const getAdminUsersFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ adminUserId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<AdminUserRecord[]> => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .middleware([requirePlatformAdminMiddleware])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async (): Promise<AdminUserRecord[]> => {
     const { data: users, error } = await supabaseAdmin
       .from("profiles")
       .select("id, email, full_name, avatar_url, is_platform_admin, created_at")
@@ -230,20 +219,18 @@ export const getAdminUsersFn = createServerFn({ method: "POST" })
   });
 
 export const toggleUserAdminStatusFn = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdminMiddleware])
   .validator((data: unknown) =>
     z
       .object({
-        adminUserId: z.string().min(1),
         targetUserId: z.string().min(1),
         makeAdmin: z.boolean(),
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .handler(async ({ data, context }) => {
     // Prevent revoking oneself to avoid locking out the last admin
-    if (data.adminUserId === data.targetUserId && !data.makeAdmin) {
+    if (context.userId === data.targetUserId && !data.makeAdmin) {
       throw new Error("You cannot revoke your own platform administrator privileges.");
     }
 
@@ -279,12 +266,9 @@ export interface AdminTransactionRecord {
 }
 
 export const getAdminRevenueFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ adminUserId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<AdminTransactionRecord[]> => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .middleware([requirePlatformAdminMiddleware])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async (): Promise<AdminTransactionRecord[]> => {
     const { data: txs, error } = await supabaseAdmin
       .from("billing_transactions")
       .select(`
@@ -330,12 +314,9 @@ export interface AdminAnalyticsData {
 }
 
 export const getAdminAnalyticsFn = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ adminUserId: z.string().min(1) }).parse(data)
-  )
-  .handler(async ({ data }): Promise<AdminAnalyticsData> => {
-    await requirePlatformAdmin(data.adminUserId);
-
+  .middleware([requirePlatformAdminMiddleware])
+  .validator((data: unknown) => z.object({}).optional().parse(data))
+  .handler(async (): Promise<AdminAnalyticsData> => {
     const [
       { data: opps },
       { data: audits },

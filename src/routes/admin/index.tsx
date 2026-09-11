@@ -38,7 +38,7 @@ function AdminOverviewPage() {
     if (!user?.id) return;
     setLoading(true);
     setError(null);
-    getAdminOverviewMetricsFn({ data: { adminUserId: user.id } })
+    getAdminOverviewMetricsFn()
       .then((data) => setMetrics(data))
       .catch((err) => setError(err.message || "Failed to load metrics."))
       .finally(() => setLoading(false));
